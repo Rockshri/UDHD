@@ -1,0 +1,660 @@
+/**
+ * Wire-format types shared by every RTK Query endpoint. These mirror
+ * the shapes emitted by the Express API — kept in sync by convention,
+ * since /frontend and /backend are independent apps. When a backend
+ * response shape changes, update the matching type here.
+ */
+
+export type UserRole = 'MD' | 'Admin' | 'Viewer';
+
+export type ProjectStatus =
+  | 'Not Started'
+  | 'In Progress'
+  | 'Completed'
+  | 'On Hold'
+  | 'Delayed';
+
+export type ProjectStage =
+  | 'Conceptualization'
+  | 'Pre-Tender'
+  | 'Tender'
+  | 'Construction'
+  | 'O&M';
+
+export type CurrentPhase =
+  | 'Conceptualization'
+  | 'Design'
+  | 'Pre-Tender'
+  | 'Tender'
+  | 'Construction'
+  | 'O&M'
+  | 'Completed';
+
+export type WorkType = 'Tender Work' | 'Tender Service' | 'Pre-Monsoon' | 'Construction' | 'Others';
+export type Priority = 'High' | 'Medium' | 'Low' | 'N/A';
+export type OmStatusOverride =
+  | 'Not Started'
+  | 'Ongoing'
+  | 'Expiring Soon'
+  | 'Expired'
+  | 'Handed Over to ULB';
+export type CosCategory =
+  | 'SCOPE ADDITION'
+  | 'SCOPE DELETION'
+  | 'DESIGN CHANGE'
+  | 'QUANTITY VARIATION'
+  | 'OTHERS';
+export type OpenClosedStatus = 'Open' | 'Closed';
+export type GeoPhotoSourceType = 'url' | 'file';
+export type MomStatus = 'Action Pending' | 'In Progress' | 'Resolved' | 'Deferred';
+export type AuditAction = 'Created' | 'Updated' | 'Deleted';
+
+/* -------- Auth -------- */
+
+export interface UserPublic {
+  userId: number;
+  username: string;
+  role: UserRole;
+  fullName: string | null;
+  canCreateProjects: boolean;
+  canUpdateProjects: boolean;
+  canDeleteProjects: boolean;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  user: UserPublic;
+  accessToken: string;
+  accessTokenExpiresAt: string;
+}
+
+export interface MeResponse {
+  user: UserPublic;
+}
+
+/* -------- Lookups -------- */
+
+export interface Lookups {
+  districts: Array<{ districtId: number; districtName: string }>;
+  sectors: Array<{ sectorId: number; sectorName: string }>;
+  schemes: Array<{ schemeId: number; schemeName: string }>;
+}
+
+/* -------- KPIs -------- */
+
+export interface OverviewKpis {
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+  onHold: number;
+  notStarted: number;
+  totalAaCr: number | null;
+  totalAgreementCr: number | null;
+  totalFinancialCr: number | null;
+  avgPhysicalPct: number | null;
+  avgFinancialPct: number | null;
+  financialUtilisationPct: number | null;
+}
+
+export interface ScheduleVsActual {
+  avgActualPct: number | null;
+  avgScheduledPctRaw: number | null;
+  projectsWithSchedule: number;
+  avgScheduledPctEffective: number | null;
+}
+
+export interface StageBucket {
+  stage: string;
+  projectCount: number;
+  totalAaCr: number | null;
+}
+
+export interface WorkTypeCounts {
+  tenderWorks: number;
+  tenderServices: number;
+  preMonsoon: number;
+  preMonsoonCritical: number;
+}
+
+export interface FinancialSecurities {
+  totalMobAdvanceCr: number | null;
+  totalAdvanceOutstandingCr: number | null;
+  totalRetentionCr: number | null;
+  totalPbgCr: number | null;
+  totalEmdCr: number | null;
+  pbgExpiredCount: number;
+}
+
+export interface PbgExpiryAlert {
+  projectId: string;
+  projectName: string | null;
+  districtId: number | null;
+  city: string | null;
+  pbgExpiryDate: string | null;
+  daysLeft: number | null;
+}
+
+export interface OmStatusRow {
+  projectId: string;
+  projectName: string | null;
+  omAgency: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  totalDays: number | null;
+  elapsedDays: number | null;
+  daysLeft: number | null;
+  pctElapsed: number | null;
+  status: string | null;
+}
+
+export interface SchemeChartRow {
+  schemeId: number;
+  schemeName: string;
+  projectCount: number;
+  avgPhysicalPct: number | null;
+  avgFinancialPct: number | null;
+  totalAgreementCr: number | null;
+  totalFinancialCr: number | null;
+}
+
+export interface StatusDonutRow {
+  status: string;
+  projectCount: number;
+}
+
+export interface SchemeSummaryRow {
+  schemeId: number;
+  schemeName: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+}
+
+export interface SectorSummaryRow {
+  sectorId: number;
+  sectorName: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+}
+
+export interface DistrictSummaryRow {
+  districtId: number;
+  districtName: string;
+  total: number;
+  completed: number;
+  delayed: number;
+  completionRatePct: number | null;
+}
+
+export interface DelayStatusRow {
+  projectId: string;
+  projectName: string | null;
+  status: string | null;
+  plannedEndDate: string | null;
+  effectiveRevisedEndDate: string | null;
+  totalDelayDays: number | null;
+  coveredByEotDays: number | null;
+  uncoveredDelayDays: number | null;
+}
+
+export interface OutstandingGapRow {
+  projectId: string;
+  projectName: string | null;
+  sectorId: number | null;
+  districtId: number | null;
+  priority: string | null;
+  remark: string | null;
+  status: string | null;
+}
+
+export interface MgmtActionSummaryRow {
+  projectId: string;
+  projectName: string | null;
+  totalItems: number;
+  openItems: number;
+  closedItems: number;
+}
+
+export interface CosEotRecord {
+  cosId: number;
+  projectId: string;
+  projectName: string | null;
+  sectorId: number | null;
+  districtId: number | null;
+  cosNumber: string | null;
+  cosDate: string | null;
+  category: string | null;
+  cosAmountCr: number | null;
+  variationPct: number | null;
+  eotNumber: string | null;
+  eotDaysGranted: number | null;
+  timeLinked: boolean | null;
+  originalEndDate: string | null;
+  newEndDate: string | null;
+  revisedDate: string | null;
+}
+
+/* -------- Projects -------- */
+
+export interface ProjectListItem {
+  projectId: string;
+  projectName: string;
+  status: string;
+  sectorId: number | null;
+  districtId: number | null;
+  city: string | null;
+  contractor: string | null;
+  pd: string | null;
+  projectStage: ProjectStage | null;
+  workType: WorkType | null;
+  priority: Priority | null;
+  physicalProgressPct: number | null;
+  financialProgressPct: number | null;
+  financialProgressCr: number | null;
+  sanctionedCostCr: number | null;
+  aaAmountCr: number | null;
+  agreementAmountCr: number | null;
+  plannedEndDate: string | null;
+  revisedEndDate: string | null;
+  expectedCompletionDate: string | null;
+  expectedCompletionRaw: string | null;
+  pbgExpiryDate: string | null;
+  remark: string | null;
+  omApplicable: boolean | null;
+  omStartDate: string | null;
+  omPeriodMonths: number | null;
+  omEndDate: string | null;
+  omStatusOverride: OmStatusOverride | null;
+  geoTaggingUrl: string | null;
+  createdAt: string;
+  lastUpdated: string | null;
+  effectivePhysicalPct: number | null;
+  isMilestoneWeighted: boolean | null;
+  schemes: number[];
+}
+
+export interface ProjectDetail extends ProjectListItem {
+  mainWork: string | null;
+  physicalWorkProgressNote: string | null;
+  sponsoringDept: string | null;
+  implementingAgency: string | null;
+  sanctionDate: string | null;
+  projectBrief: string | null;
+  currentPhase: CurrentPhase | null;
+  delayReason: string | null;
+  deptStuckAt: string | null;
+  scheduledProgressPct: number | null;
+  agreementNumber: string | null;
+  agreementDate: string | null;
+  appointedDate: string | null;
+  contractValueCr: number | null;
+  mobAdvanceIssuedCr: number | null;
+  mobAdvanceRecoveredCr: number | null;
+  advanceOutstandingCr: number | null;
+  retentionMoneyHeldCr: number | null;
+  pbgNumber: string | null;
+  pbgAmountCr: number | null;
+  pbgIssuingBank: string | null;
+  emdAmountCr: number | null;
+  emdRefNumber: string | null;
+  emdDate: string | null;
+  totalPaymentsCr: number | null;
+  lastPaymentDate: string | null;
+  lastRaBillNo: string | null;
+  omAgency: string | null;
+  omRemarks: string | null;
+  mprMonth: string | null;
+  fundReceivedCr: number | null;
+  expenditureCentralRaw: string | null;
+  expenditureStateRaw: string | null;
+  manpowerEngagedRaw: string | null;
+  mainComponentScope: string | null;
+  progressPrevMonthRaw: string | null;
+  progressThisMonthRaw: string | null;
+  mprRemark: string | null;
+}
+
+export interface ProjectUpsertPayload {
+  projectName?: string;
+  sectorId?: number | null;
+  city?: string | null;
+  districtId?: number | null;
+  contractor?: string | null;
+  pd?: string | null;
+  mainWork?: string | null;
+  physicalWorkProgressNote?: string | null;
+  projectStage?: ProjectStage | null;
+  workType?: WorkType | null;
+  sponsoringDept?: string | null;
+  implementingAgency?: string | null;
+  sanctionDate?: string | null;
+  projectBrief?: string | null;
+  currentPhase?: CurrentPhase | null;
+  status?: ProjectStatus;
+  plannedEndDate?: string | null;
+  revisedEndDate?: string | null;
+  delayReason?: string | null;
+  deptStuckAt?: string | null;
+  expectedCompletionDate?: string | null;
+  expectedCompletionRaw?: string | null;
+  priority?: Priority | null;
+  sanctionedCostCr?: number | null;
+  aaAmountCr?: number | null;
+  agreementAmountCr?: number | null;
+  physicalProgressPct?: number | null;
+  financialProgressCr?: number | null;
+  financialProgressPct?: number | null;
+  scheduledProgressPct?: number | null;
+  agreementNumber?: string | null;
+  agreementDate?: string | null;
+  appointedDate?: string | null;
+  contractValueCr?: number | null;
+  mobAdvanceIssuedCr?: number | null;
+  mobAdvanceRecoveredCr?: number | null;
+  advanceOutstandingCr?: number | null;
+  retentionMoneyHeldCr?: number | null;
+  pbgNumber?: string | null;
+  pbgAmountCr?: number | null;
+  pbgExpiryDate?: string | null;
+  pbgIssuingBank?: string | null;
+  emdAmountCr?: number | null;
+  emdRefNumber?: string | null;
+  emdDate?: string | null;
+  totalPaymentsCr?: number | null;
+  lastPaymentDate?: string | null;
+  lastRaBillNo?: string | null;
+  geoTaggingUrl?: string | null;
+  remark?: string | null;
+  omApplicable?: boolean;
+  omStartDate?: string | null;
+  omPeriodMonths?: number | null;
+  omEndDate?: string | null;
+  omAgency?: string | null;
+  omStatusOverride?: OmStatusOverride | null;
+  omRemarks?: string | null;
+  mprMonth?: string | null;
+  fundReceivedCr?: number | null;
+  expenditureCentralRaw?: string | null;
+  expenditureStateRaw?: string | null;
+  manpowerEngagedRaw?: string | null;
+  mainComponentScope?: string | null;
+  progressPrevMonthRaw?: string | null;
+  progressThisMonthRaw?: string | null;
+  mprRemark?: string | null;
+  schemes?: number[];
+}
+
+/* -------- Nested resources -------- */
+
+export interface CosEotItem {
+  cosId: number;
+  projectId: string;
+  cosNumber: string | null;
+  cosDate: string | null;
+  category: CosCategory | null;
+  cosAmountCr: number | null;
+  variationPct: number | null;
+  eotNumber: string | null;
+  eotDaysGranted: number | null;
+  timeLinked: boolean | null;
+  originalEndDate: string | null;
+  newEndDate: string | null;
+  revisedDate: string | null;
+}
+
+export interface CosEotUpsertPayload {
+  cosNumber?: string | null;
+  cosDate?: string | null;
+  category?: CosCategory | null;
+  cosAmountCr?: number | null;
+  variationPct?: number | null;
+  eotNumber?: string | null;
+  eotDaysGranted?: number | null;
+  timeLinked?: boolean;
+  originalEndDate?: string | null;
+  newEndDate?: string | null;
+  revisedDate?: string | null;
+}
+
+export interface MgmtActionItem {
+  itemId: number;
+  projectId: string;
+  topic: string;
+  status: OpenClosedStatus;
+  deadlineDate: string | null;
+  createdAt: string;
+}
+
+export interface MgmtActionUpsertPayload {
+  topic?: string;
+  status?: OpenClosedStatus;
+  deadlineDate?: string | null;
+}
+
+export interface MilestoneItem {
+  milestoneId: number;
+  projectId: string;
+  milestoneName: string;
+  weightPct: number | null;
+  plannedDate: string | null;
+  sortOrder: number | null;
+}
+
+export interface ReplaceMilestonesPayload {
+  milestones: Array<{
+    milestoneId?: number;
+    milestoneName: string;
+    weightPct: number;
+    plannedDate?: string | null;
+    sortOrder?: number;
+  }>;
+}
+
+export interface MonthlyProgressPayload {
+  snapMonth: string;
+  entries: Array<{
+    milestoneId: number;
+    progressPct: number;
+    note?: string | null;
+  }>;
+}
+
+export interface MonthlyProgressItem {
+  mpId: number;
+  milestoneId: number;
+  projectId: string;
+  snapMonth: string;
+  progressPct: number | null;
+  weightedContribution: number | null;
+  note: string | null;
+}
+
+export interface PhysicalHistoryPoint {
+  snapMonth: string;
+  weightedPhysicalPct: number | null;
+}
+
+export interface MilestoneHistoryPoint {
+  milestoneId: number;
+  milestoneName: string;
+  weightPct: number | null;
+  snapMonth: string;
+  progressPct: number | null;
+  weightedContribution: number | null;
+}
+
+export interface MoM {
+  momId: number;
+  meetingDate: string;
+  meetingTitle: string;
+  venue: string | null;
+  chairperson: string | null;
+  attendees: string | null;
+  projectId: string | null;
+  agenda: string | null;
+  decisions: string | null;
+  momStatus: MomStatus;
+  remarks: string | null;
+  createdAt: string;
+}
+
+export interface MoMActionPoint {
+  actionId: number;
+  momId: number;
+  description: string;
+  owner: string | null;
+  dueDate: string | null;
+  status: OpenClosedStatus;
+  resolutionDate: string | null;
+}
+
+export interface MoMDetail extends MoM {
+  actionPoints: MoMActionPoint[];
+}
+
+export interface MoMUpsertPayload {
+  meetingDate?: string;
+  meetingTitle?: string;
+  venue?: string | null;
+  chairperson?: string | null;
+  attendees?: string | null;
+  projectId?: string | null;
+  agenda?: string | null;
+  decisions?: string | null;
+  momStatus?: MomStatus;
+  remarks?: string | null;
+}
+
+export interface MoMActionPointUpsertPayload {
+  description?: string;
+  owner?: string | null;
+  dueDate?: string | null;
+  status?: OpenClosedStatus;
+  resolutionDate?: string | null;
+}
+
+export interface PreMonsoonItem {
+  itemId: number;
+  topic: string;
+  priority: Priority | null;
+  deadlineDate: string | null;
+  createdAt: string;
+}
+
+export interface PreMonsoonUpsertPayload {
+  topic?: string;
+  priority?: Priority | null;
+  deadlineDate?: string | null;
+}
+
+export interface GeoPhoto {
+  photoId: number;
+  projectId: string;
+  url: string;
+  caption: string | null;
+  photoDate: string | null;
+  sourceType: GeoPhotoSourceType | null;
+  fileName: string | null;
+}
+
+export interface GeoPhotoUrlCreatePayload {
+  url: string;
+  caption?: string | null;
+  photoDate?: string | null;
+}
+
+export interface GeoPhotoUpdatePayload {
+  caption?: string | null;
+  photoDate?: string | null;
+}
+
+/* -------- User management + audit -------- */
+
+export interface UserRow {
+  userId: number;
+  username: string;
+  fullName: string | null;
+  role: UserRole;
+  isActive: boolean | null;
+  canCreateProjects: boolean;
+  canUpdateProjects: boolean;
+  canDeleteProjects: boolean;
+  createdBy: number | null;
+  createdAt: string | null;
+  lastLogin: string | null;
+}
+
+export interface CreateUserPayload {
+  username: string;
+  password: string;
+  role: UserRole;
+  fullName?: string | null;
+  canCreateProjects?: boolean;
+  canUpdateProjects?: boolean;
+  canDeleteProjects?: boolean;
+}
+
+export interface UpdateUserPayload {
+  fullName?: string | null;
+  role?: UserRole;
+  isActive?: boolean;
+  password?: string;
+  canCreateProjects?: boolean;
+  canUpdateProjects?: boolean;
+  canDeleteProjects?: boolean;
+}
+
+export interface AuditChange {
+  changeId: number;
+  auditId: number;
+  fieldKey: string;
+  fieldLabel: string | null;
+  beforeValue: string | null;
+  afterValue: string | null;
+}
+
+export interface AuditItem {
+  auditId: number;
+  projectId: string | null;
+  projectNameSnapshot: string | null;
+  userId: number | null;
+  userLabel: string;
+  roleLabel: string | null;
+  action: AuditAction;
+  changedAt: string;
+  changes: AuditChange[];
+}
+
+/* -------- Pagination envelopes -------- */
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export interface OffsetPage<T> {
+  items: T[];
+  nextOffset: number | null;
+}
+
+export interface ItemsResponse<T> {
+  items: T[];
+}
+
+/* -------- Error envelope -------- */
+
+export interface ApiErrorBody {
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
