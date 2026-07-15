@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
+  ContractType,
   CurrentPhase,
   OmStatusOverride,
   Priority,
   ProjectDetail,
   ProjectStage,
+  ProjectStageV2,
   ProjectStatus,
   ProjectUpsertPayload,
   WorkType,
@@ -20,18 +22,24 @@ export interface ProjectDraft {
   sectorId: number | null;
   city: string | null;
   districtId: number | null;
+  divisionId: number | null;
   contractor: string | null;
   pd: string | null;
   mainWork: string | null;
   physicalWorkProgressNote: string | null;
+  /** @deprecated Kept for legacy round-trip only; form no longer edits it. */
   projectStage: ProjectStage | null;
+  /** @deprecated Kept for legacy round-trip only; form no longer edits it. */
   workType: WorkType | null;
+  contractType: ContractType | null;
   sponsoringDept: string | null;
   implementingAgency: string | null;
   sanctionDate: string | null;
   projectBrief: string | null;
 
+  /** @deprecated Kept for legacy round-trip only; form no longer edits it. */
   currentPhase: CurrentPhase | null;
+  projectStageV2: ProjectStageV2 | null;
   status: ProjectStatus;
   plannedEndDate: string | null;
   revisedEndDate: string | null;
@@ -43,6 +51,7 @@ export interface ProjectDraft {
   priority: Priority | null;
   sanctionedCostCr: number | null;
   aaAmountCr: number | null;
+  revisedAaAmountCr: number | null;
   agreementAmountCr: number | null;
   physicalProgressPct: number | null;
   financialProgressCr: number | null;
@@ -97,18 +106,21 @@ export const EMPTY_DRAFT: ProjectDraft = {
   sectorId: null,
   city: null,
   districtId: null,
+  divisionId: null,
   contractor: null,
   pd: null,
   mainWork: null,
   physicalWorkProgressNote: null,
   projectStage: null,
   workType: null,
+  contractType: null,
   sponsoringDept: null,
   implementingAgency: null,
   sanctionDate: null,
   projectBrief: null,
 
   currentPhase: null,
+  projectStageV2: null,
   status: 'Not Started',
   plannedEndDate: null,
   revisedEndDate: null,
@@ -120,6 +132,7 @@ export const EMPTY_DRAFT: ProjectDraft = {
   priority: null,
   sanctionedCostCr: null,
   aaAmountCr: null,
+  revisedAaAmountCr: null,
   agreementAmountCr: null,
   physicalProgressPct: null,
   financialProgressCr: null,
@@ -199,6 +212,10 @@ export function draftToPayload(draft: ProjectDraft): ProjectUpsertPayload {
   result.status = draft.status;
   result.schemes = draft.schemes;
   result.omApplicable = draft.omApplicable;
+  // Phase A §4.2 — Sanctioned Cost is a derived, read-only field. Overwrite
+  // whatever was in the draft with the auto-populated value so the DB column
+  // stays consistent with what the UI shows.
+  result.sanctionedCostCr = draft.revisedAaAmountCr ?? draft.aaAmountCr ?? null;
   if (draft.geoTaggingUrl && !/^https?:\/\//i.test(draft.geoTaggingUrl)) {
     // Backend uses z.string().url() — drop invalid values silently so the
     // rest of the save still succeeds; the user can fix and re-save.

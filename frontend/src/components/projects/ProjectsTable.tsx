@@ -26,6 +26,7 @@ interface LookupCtx {
   sectorById: Map<number, string>;
   districtById: Map<number, string>;
   schemeById: Map<number, string>;
+  divisionById: Map<number, { name: string; regionName: string }>;
 }
 
 const COLUMNS: Column[] = [
@@ -63,6 +64,26 @@ const COLUMNS: Column[] = [
     render: (r, _i, ctx) =>
       r.districtId ? (ctx.districtById.get(r.districtId) ?? '—') : '—',
     sortValue: (r) => r.districtId,
+  },
+  {
+    key: 'division',
+    label: 'Division',
+    minWidth: 130,
+    defaultVisible: true,
+    render: (r, _i, ctx) =>
+      r.divisionId ? (ctx.divisionById.get(r.divisionId)?.name ?? '—') : '—',
+    sortValue: (r) => r.divisionId,
+  },
+  {
+    key: 'region',
+    label: 'Region',
+    minWidth: 110,
+    defaultVisible: false,
+    render: (r, _i, ctx) =>
+      r.divisionId ? (ctx.divisionById.get(r.divisionId)?.regionName ?? '—') : '—',
+    // Sort proxies on divisionId (South Bihar IDs precede North Bihar per the
+    // migration insert order) so we don't need lookup ctx in sortValue.
+    sortValue: (r) => r.divisionId,
   },
   {
     key: 'contractor',
@@ -111,21 +132,22 @@ const COLUMNS: Column[] = [
     },
     sortValue: (r) => (r.schemes && r.schemes.length > 0 ? r.schemes[0] ?? null : null),
   },
+  // Note: 'division' + 'region' columns are inserted alongside 'district' above.
   {
-    key: 'projectStage',
+    key: 'projectStageV2',
     label: 'Stage',
     minWidth: 130,
     defaultVisible: false,
-    render: (r) => r.projectStage ?? '—',
-    sortValue: (r) => r.projectStage,
+    render: (r) => r.projectStageV2 ?? '—',
+    sortValue: (r) => r.projectStageV2,
   },
   {
-    key: 'workType',
-    label: 'Work Type',
-    minWidth: 120,
+    key: 'contractType',
+    label: 'Contract Type',
+    minWidth: 140,
     defaultVisible: false,
-    render: (r) => r.workType ?? '—',
-    sortValue: (r) => r.workType,
+    render: (r) => r.contractType ?? '—',
+    sortValue: (r) => r.contractType,
   },
   {
     key: 'aaAmountCr',
@@ -135,6 +157,15 @@ const COLUMNS: Column[] = [
     defaultVisible: true,
     render: (r) => <span className="tabular-nums">{formatCurrencyCr(r.aaAmountCr)}</span>,
     sortValue: (r) => r.aaAmountCr,
+  },
+  {
+    key: 'revisedAaAmountCr',
+    label: 'Revised AA (₹ Cr.)',
+    minWidth: 130,
+    align: 'right',
+    defaultVisible: false,
+    render: (r) => <span className="tabular-nums">{formatCurrencyCr(r.revisedAaAmountCr)}</span>,
+    sortValue: (r) => r.revisedAaAmountCr,
   },
   {
     key: 'agreementAmountCr',
@@ -183,8 +214,8 @@ const COLUMNS: Column[] = [
   },
   {
     key: 'status',
-    label: 'Status',
-    minWidth: 120,
+    label: 'Execution Status',
+    minWidth: 140,
     defaultVisible: true,
     render: (r) => <StatusBadge status={r.status} />,
     sortValue: (r) => r.status,
@@ -299,14 +330,22 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const navigate = useNavigate();
 
-  const ctx = useMemo<LookupCtx>(
-    () => ({
+  const ctx = useMemo<LookupCtx>(() => {
+    const regionById = new Map(
+      (lookups?.regions ?? []).map((r) => [r.regionId, r.regionName]),
+    );
+    return {
       sectorById: new Map((lookups?.sectors ?? []).map((s) => [s.sectorId, s.sectorName])),
       districtById: new Map((lookups?.districts ?? []).map((d) => [d.districtId, d.districtName])),
       schemeById: new Map((lookups?.schemes ?? []).map((s) => [s.schemeId, s.schemeName])),
-    }),
-    [lookups],
-  );
+      divisionById: new Map(
+        (lookups?.divisions ?? []).map((d) => [
+          d.divisionId,
+          { name: d.divisionName, regionName: regionById.get(d.regionId) ?? '' },
+        ]),
+      ),
+    };
+  }, [lookups]);
 
   const visibleColumns = COLUMNS.filter((c) => visibility[c.key] !== false);
   const toggle = (key: string): void => {

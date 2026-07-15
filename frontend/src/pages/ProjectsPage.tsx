@@ -15,8 +15,11 @@ function buildQuery(f: ReturnType<typeof useProjectFilters>['filters'], cursor?:
   if (f.search) q.search = f.search;
   if (f.status) q.status = f.status;
   if (f.projectStage) q.projectStage = f.projectStage;
+  if (f.contractType) q.contractType = f.contractType;
   if (f.sectorId) q.sectorId = Number(f.sectorId);
   if (f.districtId) q.districtId = Number(f.districtId);
+  if (f.divisionId) q.divisionId = Number(f.divisionId);
+  if (f.regionId) q.regionId = Number(f.regionId);
   if (f.schemeId) q.schemeId = Number(f.schemeId);
   return q;
 }
@@ -26,14 +29,13 @@ export function ProjectsPage(): JSX.Element {
   const { filters, activeCount } = filterState;
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
-  // Note: workType + priority filters aren't yet exposed by the backend list
-  // endpoint — we apply them client-side over the current page.
+  // Note: priority filter is not yet exposed by the backend list endpoint —
+  // we apply it client-side over the current page.
   const query = useListProjectsQuery(buildQuery(filters, cursor));
   const lookups = useGetLookupsQuery();
 
   const rawItems = query.data?.items ?? [];
   const filteredItems = rawItems.filter((r) => {
-    if (filters.workType && r.workType !== filters.workType) return false;
     if (filters.priority && r.priority !== filters.priority) return false;
     return true;
   });

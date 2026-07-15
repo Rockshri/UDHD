@@ -10,10 +10,13 @@ import { useSearchParams } from 'react-router-dom';
 export interface ProjectFilters {
   search: string;
   status: string;
+  /** Backed by new project_stage_v2 column (Phase A §3.2). */
   projectStage: string;
-  workType: string;
+  contractType: string;
   priority: string;
   districtId: string;
+  divisionId: string;
+  regionId: string;
   sectorId: string;
   schemeId: string;
 }
@@ -22,9 +25,11 @@ const EMPTY: ProjectFilters = {
   search: '',
   status: '',
   projectStage: '',
-  workType: '',
+  contractType: '',
   priority: '',
   districtId: '',
+  divisionId: '',
+  regionId: '',
   sectorId: '',
   schemeId: '',
 };

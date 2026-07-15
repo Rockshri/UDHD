@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { auditLog, minutesOfMeeting, project, projectScheme } from '../db/schema.js';
+import { auditLog, division, minutesOfMeeting, project, projectScheme } from '../db/schema.js';
 import type { Project } from '../db/schema.js';
 import { vProjectEffectivePhysical } from '../db/views.js';
 import { recordAudit, type AuditActor, type DbExecutor } from '../lib/audit.js';
@@ -15,6 +15,7 @@ import { HttpError } from '../middleware/errorHandler.js';
 const NUMERIC_KEYS = [
   'sanctionedCostCr',
   'aaAmountCr',
+  'revisedAaAmountCr',
   'agreementAmountCr',
   'physicalProgressPct',
   'financialProgressCr',
@@ -54,8 +55,12 @@ export const listProjectsQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
   cursor: z.string().min(1).optional(),
   status: z.string().min(1).optional(),
+  /** Filters on the new project_stage_v2 column (Phase A §3.2). */
   projectStage: z.string().min(1).optional(),
+  contractType: z.string().min(1).optional(),
   districtId: z.coerce.number().int().positive().optional(),
+  divisionId: z.coerce.number().int().positive().optional(),
+  regionId: z.coerce.number().int().positive().optional(),
   sectorId: z.coerce.number().int().positive().optional(),
   schemeId: z.coerce.number().int().positive().optional(),
   search: z.string().min(1).max(200).optional(),
@@ -73,8 +78,11 @@ export async function listProjects(
 ): Promise<{ items: ProjectListItem[]; nextCursor: string | null }> {
   const filters = [] as ReturnType<typeof eq>[];
   if (q.status) filters.push(eq(project.status, q.status));
-  if (q.projectStage) filters.push(eq(project.projectStage, q.projectStage));
+  // Phase A §3.2 — the UI's "Project Stage" filter targets the new column.
+  if (q.projectStage) filters.push(eq(project.projectStageV2, q.projectStage));
+  if (q.contractType) filters.push(eq(project.contractType, q.contractType));
   if (q.districtId) filters.push(eq(project.districtId, q.districtId));
+  if (q.divisionId) filters.push(eq(project.divisionId, q.divisionId));
   if (q.sectorId) filters.push(eq(project.sectorId, q.sectorId));
 
   if (q.cursor) {
@@ -87,6 +95,13 @@ export async function listProjects(
     );
   }
 
+  // Region filter: pass through to project.divisionId via a subquery join,
+  // since the project table has no region_id column of its own.
+  const regionClause = q.regionId
+    ? sql`${project.divisionId} IN (SELECT ${division.divisionId} FROM ${division}
+                                    WHERE ${division.regionId} = ${q.regionId})`
+    : undefined;
+
   const searchClause = q.search
     ? sql`(${project.projectName} ILIKE ${'%' + q.search + '%'} OR ${project.projectId} = ${q.search})`
     : undefined;
@@ -97,7 +112,7 @@ export async function listProjects(
                     AND ps.scheme_id = ${q.schemeId})`
     : undefined;
 
-  const whereClauses = [...filters, searchClause, schemeJoin].filter(
+  const whereClauses = [...filters, searchClause, schemeJoin, regionClause].filter(
     (c): c is NonNullable<typeof c> => c !== undefined,
   );
 

@@ -4,7 +4,7 @@ import { FormField } from './FormField';
 import { FormSectionHeader } from './FormSectionHeader';
 import type { ProjectDraft } from '../../hooks/useProjectDraft';
 import type { CosEotItem } from '../../types/api';
-import type { CurrentPhase, ProjectStatus } from '../../types/api';
+import type { ProjectStageV2, ProjectStatus } from '../../types/api';
 
 interface Props {
   draft: ProjectDraft;
@@ -12,14 +12,15 @@ interface Props {
   cosItems: CosEotItem[];
 }
 
-const CURRENT_PHASES = [
-  'Conceptualization',
+/** New Project Stage dropdown (Phase A §3.2) — replaces the removed Current Phase. */
+const PROJECT_STAGES_V2 = [
+  'Conceptualisation',
   'Design',
   'Pre-Tender',
   'Tender',
   'Construction',
   'O&M',
-  'Completed',
+  'Other',
 ] as const;
 
 const STATUSES = ['Not Started', 'In Progress', 'Completed', 'On Hold', 'Delayed'] as const;
@@ -93,14 +94,15 @@ export function PhaseDatesSection({ draft, setField, cosItems }: Props): JSX.Ele
         />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <FormField
-            label="Current Phase"
+            label="Project Stage"
             type="select"
-            value={draft.currentPhase ?? ''}
-            onChange={(v) => setField('currentPhase', (v as CurrentPhase) || null)}
-            options={CURRENT_PHASES as unknown as string[]}
+            value={draft.projectStageV2 ?? ''}
+            onChange={(v) => setField('projectStageV2', (v as ProjectStageV2) || null)}
+            options={PROJECT_STAGES_V2 as unknown as string[]}
+            required
           />
           <FormField
-            label="Project Status"
+            label="Execution Status"
             type="select"
             value={draft.status}
             onChange={(v) => setField('status', v as ProjectStatus)}

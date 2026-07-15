@@ -5,6 +5,7 @@ import { AppShell } from './components/layout/AppShell';
 import { AuditTrailPage } from './pages/AuditTrailPage';
 import { CosEotPage } from './pages/CosEotPage';
 import { DistrictsPage } from './pages/DistrictsPage';
+import { DivisionsPage } from './pages/DivisionsPage';
 import { InputSheetPage } from './pages/InputSheetPage';
 import { LoginPage } from './pages/LoginPage';
 import { MgmtActionsPage } from './pages/MgmtActionsPage';
@@ -34,6 +35,7 @@ export function AppRoutes(): JSX.Element {
           <Route path="schemes" element={<SchemesPage />} />
           <Route path="sectors" element={<SectorsPage />} />
           <Route path="districts" element={<DistrictsPage />} />
+          <Route path="divisions" element={<DivisionsPage />} />
 
           {/* Projects — 6.3 */}
           <Route path="projects" element={<ProjectsPage />} />

@@ -302,6 +302,12 @@ export function CosEotSection({ projectId, items }: Props): JSX.Element {
   );
 }
 
+/**
+ * Phase A §5 — CoS and EoT fields are split into two independent visual
+ * blocks. Same DB record backs both blocks (one `cos_eot_item` row is one
+ * CoS event with its EoT extension), but the UI keeps them visually
+ * separated for readability.
+ */
 function CosRowForm({
   row,
   onChange,
@@ -313,70 +319,81 @@ function CosRowForm({
     onChange({ ...row, [key]: value });
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-      <FormField label="CoS Number" value={row.cosNumber} onChange={(v) => set('cosNumber', v)} />
-      <FormField label="CoS Date" type="date" value={row.cosDate} onChange={(v) => set('cosDate', v)} />
-      <FormField
-        label="Category"
-        type="select"
-        value={row.category}
-        onChange={(v) => set('category', v as CosCategory)}
-        options={CATEGORIES as unknown as string[]}
-      />
-      <NumberField
-        label="CoS Amount"
-        suffix="₹ Cr"
-        value={row.cosAmountCr}
-        onChange={(v) => set('cosAmountCr', v)}
-      />
-      <NumberField
-        label="Variation"
-        suffix="%"
-        value={row.variationPct}
-        onChange={(v) => set('variationPct', v)}
-      />
-      <FormField label="EoT Number" value={row.eotNumber} onChange={(v) => set('eotNumber', v)} />
-      <NumberField
-        label="EoT Days Granted"
-        value={row.eotDaysGranted}
-        onChange={(v) => set('eotDaysGranted', v)}
-      />
-      <FormField
-        label="Time Linked?"
-        type="select"
-        value={row.timeLinked ? 'Yes' : 'No'}
-        onChange={(v) => set('timeLinked', v === 'Yes')}
-        options={['No', 'Yes']}
-      />
-      <FormField
-        label="Original End Date"
-        type="date"
-        value={row.originalEndDate}
-        onChange={(v) => set('originalEndDate', v)}
-      />
-      <FormField
-        label="New End Date (after EoT)"
-        type="date"
-        value={row.newEndDate}
-        onChange={(v) => set('newEndDate', v)}
-      />
-      <FormField
-        label="Revised Date (if different)"
-        type="date"
-        value={row.revisedDate}
-        onChange={(v) => set('revisedDate', v)}
-      />
+    <div className="space-y-3">
+      <BlockPanel title="CoS Block" accent="#7C3AED" tint="#F5F3FF">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <FormField label="CoS Number" value={row.cosNumber} onChange={(v) => set('cosNumber', v)} />
+          <FormField label="CoS Date" type="date" value={row.cosDate} onChange={(v) => set('cosDate', v)} />
+          <FormField
+            label="Category"
+            type="select"
+            value={row.category}
+            onChange={(v) => set('category', v as CosCategory)}
+            options={CATEGORIES as unknown as string[]}
+          />
+          <NumberField
+            label="CoS Amount"
+            suffix="₹ Cr"
+            value={row.cosAmountCr}
+            onChange={(v) => set('cosAmountCr', v)}
+          />
+          <NumberField
+            label="Variation"
+            suffix="%"
+            value={row.variationPct}
+            onChange={(v) => set('variationPct', v)}
+          />
+        </div>
+      </BlockPanel>
+
+      <BlockPanel title="EoT Block" accent="#2563EB" tint="#EFF6FF">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <FormField label="EoT Number" value={row.eotNumber} onChange={(v) => set('eotNumber', v)} />
+          <NumberField
+            label="EoT Days Granted"
+            value={row.eotDaysGranted}
+            onChange={(v) => set('eotDaysGranted', v)}
+          />
+          <FormField
+            label="Time Linked?"
+            type="select"
+            value={row.timeLinked ? 'Yes' : 'No'}
+            onChange={(v) => set('timeLinked', v === 'Yes')}
+            options={['No', 'Yes']}
+          />
+          <FormField
+            label="Original End Date"
+            type="date"
+            value={row.originalEndDate}
+            onChange={(v) => set('originalEndDate', v)}
+          />
+          <FormField
+            label="New End Date (after EoT)"
+            type="date"
+            value={row.newEndDate}
+            onChange={(v) => set('newEndDate', v)}
+          />
+          <FormField
+            label="Revised Date (if different)"
+            type="date"
+            value={row.revisedDate}
+            onChange={(v) => set('revisedDate', v)}
+          />
+        </div>
+      </BlockPanel>
     </div>
   );
 }
 
 function CosRowReadOnly({ item }: { item: CosEotItem }): JSX.Element {
-  const rows: Array<[string, string]> = [
+  const cosRows: Array<[string, string]> = [
     ['CoS Number', item.cosNumber ?? '—'],
     ['CoS Date', item.cosDate ?? '—'],
     ['Category', item.category ?? '—'],
     ['CoS Amount', item.cosAmountCr !== null ? `₹ ${item.cosAmountCr.toFixed(2)} Cr` : '—'],
     ['Variation', item.variationPct !== null ? `${item.variationPct.toFixed(2)}%` : '—'],
+  ];
+  const eotRows: Array<[string, string]> = [
     ['EoT Number', item.eotNumber ?? '—'],
     ['EoT Days', String(item.eotDaysGranted ?? 0)],
     ['Time Linked', item.timeLinked ? 'Yes' : 'No'],
@@ -385,7 +402,44 @@ function CosRowReadOnly({ item }: { item: CosEotItem }): JSX.Element {
     ['Revised', item.revisedDate ?? '—'],
   ];
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px] md:grid-cols-4">
+    <div className="space-y-3">
+      <BlockPanel title="CoS Block" accent="#7C3AED" tint="#F5F3FF">
+        <ReadOnlyGrid rows={cosRows} />
+      </BlockPanel>
+      <BlockPanel title="EoT Block" accent="#2563EB" tint="#EFF6FF">
+        <ReadOnlyGrid rows={eotRows} />
+      </BlockPanel>
+    </div>
+  );
+}
+
+function BlockPanel({
+  title, accent, tint, children,
+}: {
+  title: string;
+  accent: string;
+  tint: string;
+  children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <div
+      className="overflow-hidden rounded-lg border border-[#E5E7EB]"
+      style={{ borderLeft: `4px solid ${accent}` }}
+    >
+      <div
+        className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider"
+        style={{ backgroundColor: tint, color: accent }}
+      >
+        {title}
+      </div>
+      <div className="px-3 py-3">{children}</div>
+    </div>
+  );
+}
+
+function ReadOnlyGrid({ rows }: { rows: Array<[string, string]> }): JSX.Element {
+  return (
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px] md:grid-cols-3">
       {rows.map(([k, v]) => (
         <div key={k}>
           <dt className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">{k}</dt>

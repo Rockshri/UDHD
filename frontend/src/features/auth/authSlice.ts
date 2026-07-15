@@ -18,6 +18,8 @@ export interface AuthState {
   accessTokenExpiresAt: string | null;
   /** `unknown` before the initial refresh attempt completes; then `in` or `out`. */
   status: 'unknown' | 'in' | 'out';
+  /** True right after an MD explicitly logs in — drives the MD Scheme Summary popup. */
+  showMdBriefing: boolean;
 }
 
 const initialState: AuthState = {
@@ -25,6 +27,7 @@ const initialState: AuthState = {
   accessToken: null,
   accessTokenExpiresAt: null,
   status: 'unknown',
+  showMdBriefing: false,
 };
 
 export interface SetCredentialsPayload {
@@ -48,6 +51,7 @@ const authSlice = createSlice({
       state.accessToken = null;
       state.accessTokenExpiresAt = null;
       state.status = 'out';
+      state.showMdBriefing = false;
     },
     /** After the initial refresh attempt returns 401, mark us as definitively out. */
     markUnauthenticated(state) {
@@ -55,10 +59,27 @@ const authSlice = createSlice({
         state.status = 'out';
       }
     },
+    /**
+     * Dispatched by the login mutation (not by silent refresh) so the MD
+     * scheme-summary popup opens on every explicit sign-in but stays out
+     * of the way when the app just resumes an existing session.
+     */
+    openMdBriefing(state) {
+      state.showMdBriefing = true;
+    },
+    dismissMdBriefing(state) {
+      state.showMdBriefing = false;
+    },
   },
 });
 
-export const { setCredentials, clearCredentials, markUnauthenticated } = authSlice.actions;
+export const {
+  setCredentials,
+  clearCredentials,
+  markUnauthenticated,
+  openMdBriefing,
+  dismissMdBriefing,
+} = authSlice.actions;
 export const authReducer = authSlice.reducer;
 
 /* Selectors — typed against RootState via inference in hooks.ts. */
@@ -71,6 +92,7 @@ export const selectAccessToken = (s: WithAuth): string | null => s.auth.accessTo
 export const selectCurrentUser = (s: WithAuth): UserPublic | null => s.auth.user;
 export const selectAuthStatus = (s: WithAuth): AuthState['status'] => s.auth.status;
 export const selectIsAuthenticated = (s: WithAuth): boolean => s.auth.status === 'in';
+export const selectShowMdBriefing = (s: WithAuth): boolean => s.auth.showMdBriefing;
 export const selectHasRole = (s: WithAuth, ...roles: readonly UserPublic['role'][]): boolean => {
   const role = s.auth.user?.role;
   return role !== undefined && roles.includes(role);

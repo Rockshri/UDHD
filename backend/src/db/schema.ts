@@ -34,6 +34,25 @@ export const district = pgTable('district', {
   districtName: varchar('district_name', { length: 60 }).notNull().unique(),
 });
 
+export const region = pgTable('region', {
+  regionId: serial('region_id').primaryKey(),
+  regionName: varchar('region_name', { length: 60 }).notNull().unique(),
+});
+
+export const division = pgTable(
+  'division',
+  {
+    divisionId: serial('division_id').primaryKey(),
+    divisionName: varchar('division_name', { length: 80 }).notNull().unique(),
+    regionId: integer('region_id')
+      .notNull()
+      .references(() => region.regionId),
+  },
+  (t) => ({
+    regionIdx: index('idx_division_region').on(t.regionId),
+  }),
+);
+
 export const sector = pgTable('sector', {
   sectorId: serial('sector_id').primaryKey(),
   sectorName: varchar('sector_name', { length: 40 }).notNull().unique(),
@@ -57,19 +76,26 @@ export const project = pgTable(
     sectorId: integer('sector_id').references(() => sector.sectorId),
     city: varchar('city', { length: 100 }),
     districtId: integer('district_id').references(() => district.districtId),
+    divisionId: integer('division_id').references(() => division.divisionId),
     contractor: varchar('contractor', { length: 200 }),
     pd: varchar('pd', { length: 120 }),
     mainWork: text('main_work'),
     physicalWorkProgressNote: text('physical_work_progress_note'),
+    /** @deprecated Soft-removed from UI in Phase A (0006); column kept for legacy round-trip. */
     projectStage: varchar('project_stage', { length: 20 }),
+    /** @deprecated Soft-removed from UI in Phase A (0006); column kept for legacy round-trip. */
     workType: varchar('work_type', { length: 20 }),
+    contractType: varchar('contract_type', { length: 20 }),
     sponsoringDept: varchar('sponsoring_dept', { length: 150 }),
     implementingAgency: varchar('implementing_agency', { length: 150 }),
     sanctionDate: date('sanction_date'),
     projectBrief: text('project_brief'),
 
+    /** @deprecated Soft-removed from UI in Phase A (0006); backfilled into projectStageV2. */
     currentPhase: varchar('current_phase', { length: 20 }),
+    /** Backend column name stays `status`; UI label is "Execution Status" (Phase A §2). */
     status: varchar('status', { length: 20 }).notNull().default('Not Started'),
+    projectStageV2: varchar('project_stage_v2', { length: 20 }),
     plannedEndDate: date('planned_end_date'),
     revisedEndDate: date('revised_end_date'),
     delayReason: text('delay_reason'),
@@ -80,6 +106,7 @@ export const project = pgTable(
     priority: varchar('priority', { length: 6 }),
     sanctionedCostCr: numeric('sanctioned_cost_cr', { precision: 12, scale: 2 }),
     aaAmountCr: numeric('aa_amount_cr', { precision: 12, scale: 2 }),
+    revisedAaAmountCr: numeric('revised_aa_amount_cr', { precision: 12, scale: 2 }),
     agreementAmountCr: numeric('agreement_amount_cr', { precision: 12, scale: 2 }),
     physicalProgressPct: numeric('physical_progress_pct', { precision: 5, scale: 2 }),
     financialProgressCr: numeric('financial_progress_cr', { precision: 12, scale: 2 }),
@@ -399,6 +426,8 @@ export const refreshToken = pgTable(
 export type District = typeof district.$inferSelect;
 export type Sector = typeof sector.$inferSelect;
 export type Scheme = typeof scheme.$inferSelect;
+export type Region = typeof region.$inferSelect;
+export type Division = typeof division.$inferSelect;
 
 export type Project = typeof project.$inferSelect;
 export type ProjectInsert = typeof project.$inferInsert;

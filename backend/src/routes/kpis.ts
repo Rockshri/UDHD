@@ -95,6 +95,14 @@ kpisRouter.get('/scheme-summary', async (_req, res, next) => {
   }
 });
 
+kpisRouter.get('/scheme-kpi-summary', async (_req, res, next) => {
+  try {
+    res.json({ items: await kpi.getSchemeKpiSummary() });
+  } catch (err) {
+    next(err);
+  }
+});
+
 kpisRouter.get('/sector-summary', async (_req, res, next) => {
   try {
     res.json({ items: await kpi.getSectorSummary() });
@@ -106,6 +114,22 @@ kpisRouter.get('/sector-summary', async (_req, res, next) => {
 kpisRouter.get('/district-summary', async (_req, res, next) => {
   try {
     res.json({ items: await kpi.getDistrictSummary() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+kpisRouter.get('/division-summary', async (_req, res, next) => {
+  try {
+    res.json({ items: await kpi.getDivisionSummary() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+kpisRouter.get('/region-summary', async (_req, res, next) => {
+  try {
+    res.json({ items: await kpi.getRegionSummary() });
   } catch (err) {
     next(err);
   }

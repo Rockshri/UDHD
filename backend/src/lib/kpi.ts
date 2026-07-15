@@ -17,6 +17,7 @@ import { toNumberOrNull } from './numbers.js';
 import {
   vCosEotRecords,
   vDistrictSummary,
+  vDivisionSummary,
   vFinancialSecurities,
   vManagementActionSummary,
   vMilestoneHistory,
@@ -27,8 +28,10 @@ import {
   vPbgExpiryAlerts,
   vProjectDelayStatus,
   vProjectPhysicalHistory,
+  vRegionSummary,
   vScheduleVsActual,
   vSchemeChart,
+  vSchemeKpiSummary,
   vSchemeSummary,
   vSectorSummary,
   vStageBuckets,
@@ -275,6 +278,41 @@ export async function getSchemeSummary(): Promise<SchemeSummaryRow[]> {
   }));
 }
 
+export interface SchemeKpiSummaryRow {
+  schemeId: number;
+  schemeName: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+  onHold: number;
+  notStarted: number;
+  avgPhysicalPct: number | null;
+  avgFinancialPct: number | null;
+  totalAaCr: number | null;
+  totalFinancialCr: number | null;
+  financialUtilisationPct: number | null;
+}
+
+export async function getSchemeKpiSummary(): Promise<SchemeKpiSummaryRow[]> {
+  const rows = await db.select().from(vSchemeKpiSummary);
+  return rows.map((r) => ({
+    schemeId: r.schemeId,
+    schemeName: r.schemeName,
+    total: r.total ?? 0,
+    completed: r.completed ?? 0,
+    inProgress: r.inProgress ?? 0,
+    delayed: r.delayed ?? 0,
+    onHold: r.onHold ?? 0,
+    notStarted: r.notStarted ?? 0,
+    avgPhysicalPct: toNumberOrNull(r.avgPhysicalPct),
+    avgFinancialPct: toNumberOrNull(r.avgFinancialPct),
+    totalAaCr: toNumberOrNull(r.totalAaCr),
+    totalFinancialCr: toNumberOrNull(r.totalFinancialCr),
+    financialUtilisationPct: toNumberOrNull(r.financialUtilisationPct),
+  }));
+}
+
 export interface SectorSummaryRow {
   sectorId: number;
   sectorName: string;
@@ -314,6 +352,56 @@ export async function getDistrictSummary(): Promise<DistrictSummaryRow[]> {
     completed: r.completed ?? 0,
     delayed: r.delayed ?? 0,
     completionRatePct: toNumberOrNull(r.completionRatePct),
+  }));
+}
+
+export interface DivisionSummaryRow {
+  divisionId: number;
+  divisionName: string;
+  regionId: number;
+  regionName: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+  completionRatePct: number | null;
+}
+
+export async function getDivisionSummary(): Promise<DivisionSummaryRow[]> {
+  const rows = await db.select().from(vDivisionSummary);
+  return rows.map((r) => ({
+    divisionId: r.divisionId,
+    divisionName: r.divisionName,
+    regionId: r.regionId,
+    regionName: r.regionName,
+    total: r.total ?? 0,
+    completed: r.completed ?? 0,
+    inProgress: r.inProgress ?? 0,
+    delayed: r.delayed ?? 0,
+    completionRatePct: toNumberOrNull(r.completionRatePct),
+  }));
+}
+
+export interface RegionSummaryRow {
+  regionId: number;
+  regionName: string;
+  divisionCount: number;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+}
+
+export async function getRegionSummary(): Promise<RegionSummaryRow[]> {
+  const rows = await db.select().from(vRegionSummary);
+  return rows.map((r) => ({
+    regionId: r.regionId,
+    regionName: r.regionName,
+    divisionCount: r.divisionCount ?? 0,
+    total: r.total ?? 0,
+    completed: r.completed ?? 0,
+    inProgress: r.inProgress ?? 0,
+    delayed: r.delayed ?? 0,
   }));
 }
 

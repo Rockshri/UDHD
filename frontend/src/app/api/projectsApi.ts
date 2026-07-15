@@ -13,8 +13,12 @@ export interface ListProjectsQuery {
   limit?: number;
   cursor?: string;
   status?: string;
+  /** Filters on the new project_stage_v2 column (Phase A §3.2). */
   projectStage?: string;
+  contractType?: string;
   districtId?: number;
+  divisionId?: number;
+  regionId?: number;
   sectorId?: number;
   schemeId?: number;
   search?: string;

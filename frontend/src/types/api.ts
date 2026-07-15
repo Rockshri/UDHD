@@ -14,6 +14,7 @@ export type ProjectStatus =
   | 'On Hold'
   | 'Delayed';
 
+/** @deprecated Soft-removed from UI in Phase A. Kept for legacy round-trip only. */
 export type ProjectStage =
   | 'Conceptualization'
   | 'Pre-Tender'
@@ -21,6 +22,7 @@ export type ProjectStage =
   | 'Construction'
   | 'O&M';
 
+/** @deprecated Soft-removed from UI in Phase A. Values migrated into `projectStageV2`. */
 export type CurrentPhase =
   | 'Conceptualization'
   | 'Design'
@@ -30,7 +32,25 @@ export type CurrentPhase =
   | 'O&M'
   | 'Completed';
 
+/** @deprecated Soft-removed from UI in Phase A. Kept for legacy round-trip only. */
 export type WorkType = 'Tender Work' | 'Tender Service' | 'Pre-Monsoon' | 'Construction' | 'Others';
+
+/** New Project Stage field added in Phase A (§3.2). */
+export type ProjectStageV2 =
+  | 'Conceptualisation'
+  | 'Design'
+  | 'Pre-Tender'
+  | 'Tender'
+  | 'Construction'
+  | 'O&M'
+  | 'Other';
+
+/** New Contract Type field added in Phase A (§3.1). */
+export type ContractType =
+  | 'Work Contract'
+  | 'Service Contract'
+  | 'O&M Contract'
+  | 'Others';
 export type Priority = 'High' | 'Medium' | 'Low' | 'N/A';
 export type OmStatusOverride =
   | 'Not Started'
@@ -82,6 +102,9 @@ export interface Lookups {
   districts: Array<{ districtId: number; districtName: string }>;
   sectors: Array<{ sectorId: number; sectorName: string }>;
   schemes: Array<{ schemeId: number; schemeName: string }>;
+  /** Two regions: 'South Bihar' and 'North Bihar' (Phase B §6). */
+  regions: Array<{ regionId: number; regionName: string }>;
+  divisions: Array<{ divisionId: number; divisionName: string; regionId: number }>;
 }
 
 /* -------- KPIs -------- */
@@ -176,6 +199,22 @@ export interface SchemeSummaryRow {
   delayed: number;
 }
 
+export interface SchemeKpiSummaryRow {
+  schemeId: number;
+  schemeName: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+  onHold: number;
+  notStarted: number;
+  avgPhysicalPct: number | null;
+  avgFinancialPct: number | null;
+  totalAaCr: number | null;
+  totalFinancialCr: number | null;
+  financialUtilisationPct: number | null;
+}
+
 export interface SectorSummaryRow {
   sectorId: number;
   sectorName: string;
@@ -192,6 +231,28 @@ export interface DistrictSummaryRow {
   completed: number;
   delayed: number;
   completionRatePct: number | null;
+}
+
+export interface DivisionSummaryRow {
+  divisionId: number;
+  divisionName: string;
+  regionId: number;
+  regionName: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+  completionRatePct: number | null;
+}
+
+export interface RegionSummaryRow {
+  regionId: number;
+  regionName: string;
+  divisionCount: number;
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
 }
 
 export interface DelayStatusRow {
@@ -247,13 +308,19 @@ export interface CosEotRecord {
 export interface ProjectListItem {
   projectId: string;
   projectName: string;
+  /** Column name stays `status`; UI label is "Execution Status" (Phase A §2). */
   status: string;
   sectorId: number | null;
   districtId: number | null;
+  divisionId: number | null;
   city: string | null;
   contractor: string | null;
   pd: string | null;
+  /** @deprecated Soft-removed in Phase A; still returned for legacy round-trip. */
   projectStage: ProjectStage | null;
+  projectStageV2: ProjectStageV2 | null;
+  contractType: ContractType | null;
+  /** @deprecated Soft-removed in Phase A; still returned for legacy round-trip. */
   workType: WorkType | null;
   priority: Priority | null;
   physicalProgressPct: number | null;
@@ -261,6 +328,7 @@ export interface ProjectListItem {
   financialProgressCr: number | null;
   sanctionedCostCr: number | null;
   aaAmountCr: number | null;
+  revisedAaAmountCr: number | null;
   agreementAmountCr: number | null;
   plannedEndDate: string | null;
   revisedEndDate: string | null;
@@ -288,6 +356,7 @@ export interface ProjectDetail extends ProjectListItem {
   implementingAgency: string | null;
   sanctionDate: string | null;
   projectBrief: string | null;
+  /** @deprecated Soft-removed in Phase A; still returned for legacy round-trip. */
   currentPhase: CurrentPhase | null;
   delayReason: string | null;
   deptStuckAt: string | null;
@@ -327,16 +396,22 @@ export interface ProjectUpsertPayload {
   sectorId?: number | null;
   city?: string | null;
   districtId?: number | null;
+  divisionId?: number | null;
   contractor?: string | null;
   pd?: string | null;
   mainWork?: string | null;
   physicalWorkProgressNote?: string | null;
+  /** @deprecated Soft-removed in Phase A; forms no longer send it. */
   projectStage?: ProjectStage | null;
+  projectStageV2?: ProjectStageV2 | null;
+  contractType?: ContractType | null;
+  /** @deprecated Soft-removed in Phase A; forms no longer send it. */
   workType?: WorkType | null;
   sponsoringDept?: string | null;
   implementingAgency?: string | null;
   sanctionDate?: string | null;
   projectBrief?: string | null;
+  /** @deprecated Soft-removed in Phase A; forms no longer send it. */
   currentPhase?: CurrentPhase | null;
   status?: ProjectStatus;
   plannedEndDate?: string | null;
@@ -348,6 +423,7 @@ export interface ProjectUpsertPayload {
   priority?: Priority | null;
   sanctionedCostCr?: number | null;
   aaAmountCr?: number | null;
+  revisedAaAmountCr?: number | null;
   agreementAmountCr?: number | null;
   physicalProgressPct?: number | null;
   financialProgressCr?: number | null;

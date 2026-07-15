@@ -4,21 +4,30 @@ import { FormField } from './FormField';
 import { FormSectionHeader } from './FormSectionHeader';
 import { MultiSelectField } from './MultiSelectField';
 import type { ProjectDraft } from '../../hooks/useProjectDraft';
-import type { ProjectStage, WorkType } from '../../types/api';
+import type { ContractType } from '../../types/api';
 
 interface Props {
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
 }
 
-const STAGES = ['Conceptualization', 'Pre-Tender', 'Tender', 'Construction', 'O&M'] as const;
-const WORK_TYPES = ['Tender Work', 'Tender Service', 'Pre-Monsoon', 'Construction', 'Others'] as const;
+/** Contract Type dropdown — required field (Phase A §3.1). */
+const CONTRACT_TYPES = ['Work Contract', 'Service Contract', 'O&M Contract', 'Others'] as const;
 
 export function BasicInfoSection({ draft, setField }: Props): JSX.Element {
   const { data: lookups } = useGetLookupsQuery();
   const sectors = lookups?.sectors ?? [];
   const districts = lookups?.districts ?? [];
   const schemes = lookups?.schemes ?? [];
+  const regions = lookups?.regions ?? [];
+  const divisions = lookups?.divisions ?? [];
+
+  // Division is displayed alongside District (Phase B §6 — user opted to keep
+  // both). The Region cell is auto-derived from whichever division is picked.
+  const selectedDivision = divisions.find((d) => d.divisionId === draft.divisionId);
+  const derivedRegion = selectedDivision
+    ? regions.find((r) => r.regionId === selectedDivision.regionId)
+    : null;
 
   return (
     <Card>
@@ -51,6 +60,19 @@ export function BasicInfoSection({ draft, setField }: Props): JSX.Element {
             options={districts.map((d) => ({ value: String(d.districtId), label: d.districtName }))}
           />
           <FormField
+            label="Division"
+            type="select"
+            value={draft.divisionId === null ? '' : String(draft.divisionId)}
+            onChange={(v) => setField('divisionId', v ? Number(v) : null)}
+            options={divisions.map((d) => ({
+              value: String(d.divisionId),
+              label: d.divisionName,
+            }))}
+            hint={
+              derivedRegion ? `↳ Region · ${derivedRegion.regionName}` : 'Pick a division'
+            }
+          />
+          <FormField
             label="Contractor"
             value={draft.contractor}
             onChange={(v) => setField('contractor', v || null)}
@@ -81,18 +103,12 @@ export function BasicInfoSection({ draft, setField }: Props): JSX.Element {
             className="md:col-span-2"
           />
           <FormField
-            label="Project Stage"
+            label="Contract Type"
             type="select"
-            value={draft.projectStage ?? ''}
-            onChange={(v) => setField('projectStage', (v as ProjectStage) || null)}
-            options={STAGES as unknown as string[]}
-          />
-          <FormField
-            label="Work Type"
-            type="select"
-            value={draft.workType ?? ''}
-            onChange={(v) => setField('workType', (v as WorkType) || null)}
-            options={WORK_TYPES as unknown as string[]}
+            value={draft.contractType ?? ''}
+            onChange={(v) => setField('contractType', (v as ContractType) || null)}
+            options={CONTRACT_TYPES as unknown as string[]}
+            required
           />
           <FormField
             label="Sponsoring Department"

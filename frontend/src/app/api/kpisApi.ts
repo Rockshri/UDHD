@@ -12,7 +12,10 @@ import type {
   OverviewKpis,
   PbgExpiryAlert,
   ScheduleVsActual,
+  DivisionSummaryRow,
+  RegionSummaryRow,
   SchemeChartRow,
+  SchemeKpiSummaryRow,
   SchemeSummaryRow,
   SectorSummaryRow,
   StageBucket,
@@ -66,12 +69,24 @@ export const kpisApi = api.injectEndpoints({
       query: () => 'kpis/scheme-summary',
       providesTags: ['Kpis'],
     }),
+    getSchemeKpiSummary: build.query<ItemsResponse<SchemeKpiSummaryRow>, void>({
+      query: () => 'kpis/scheme-kpi-summary',
+      providesTags: ['Kpis'],
+    }),
     getSectorSummary: build.query<ItemsResponse<SectorSummaryRow>, void>({
       query: () => 'kpis/sector-summary',
       providesTags: ['Kpis'],
     }),
     getDistrictSummary: build.query<ItemsResponse<DistrictSummaryRow>, void>({
       query: () => 'kpis/district-summary',
+      providesTags: ['Kpis'],
+    }),
+    getDivisionSummary: build.query<ItemsResponse<DivisionSummaryRow>, void>({
+      query: () => 'kpis/division-summary',
+      providesTags: ['Kpis'],
+    }),
+    getRegionSummary: build.query<ItemsResponse<RegionSummaryRow>, void>({
+      query: () => 'kpis/region-summary',
       providesTags: ['Kpis'],
     }),
     getDelayStatus: build.query<ItemsResponse<DelayStatusRow>, void>({
@@ -106,8 +121,11 @@ export const {
   useGetSchemeChartQuery,
   useGetStatusDonutQuery,
   useGetSchemeSummaryQuery,
+  useGetSchemeKpiSummaryQuery,
   useGetSectorSummaryQuery,
   useGetDistrictSummaryQuery,
+  useGetDivisionSummaryQuery,
+  useGetRegionSummaryQuery,
   useGetDelayStatusQuery,
   useGetOutstandingGapsQuery,
   useGetMgmtActionSummaryQuery,

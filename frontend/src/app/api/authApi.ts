@@ -1,5 +1,9 @@
 import { api } from '../api';
-import { clearCredentials, setCredentials } from '../../features/auth/authSlice';
+import {
+  clearCredentials,
+  openMdBriefing,
+  setCredentials,
+} from '../../features/auth/authSlice';
 import type { AuthResponse, LoginRequest, MeResponse } from '../../types/api';
 
 export const authApi = api.injectEndpoints({
@@ -10,6 +14,9 @@ export const authApi = api.injectEndpoints({
         try {
           const { data } = await queryFulfilled;
           dispatch(setCredentials(data));
+          if (data.user.role === 'MD') {
+            dispatch(openMdBriefing());
+          }
         } catch {
           /* leave auth state untouched — the error surfaces to the caller. */
         }

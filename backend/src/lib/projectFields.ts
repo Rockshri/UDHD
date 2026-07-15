@@ -12,9 +12,11 @@
 
 import { z } from 'zod';
 import {
+  contractTypes,
   currentPhases,
   omStatusOverrides,
   priorities,
+  projectStageV2Values,
   projectStages,
   projectStatuses,
   workTypes,
@@ -54,19 +56,25 @@ export const createProjectSchema = z.object({
   sectorId: z.number().int().positive().nullable().optional(),
   city: stringField(100),
   districtId: z.number().int().positive().nullable().optional(),
+  divisionId: z.number().int().positive().nullable().optional(),
   contractor: stringField(200),
   pd: stringField(120),
   mainWork: textField(),
   physicalWorkProgressNote: textField(),
+  /** @deprecated Soft-removed from UI (Phase A). Accepted for legacy round-trip. */
   projectStage: z.enum(projectStages).nullable().optional(),
+  /** @deprecated Soft-removed from UI (Phase A). Accepted for legacy round-trip. */
   workType: z.enum(workTypes).nullable().optional(),
+  contractType: z.enum(contractTypes).nullable().optional(),
   sponsoringDept: stringField(150),
   implementingAgency: stringField(150),
   sanctionDate: dateField(),
   projectBrief: textField(),
 
+  /** @deprecated Soft-removed from UI (Phase A). Accepted for legacy round-trip. */
   currentPhase: z.enum(currentPhases).nullable().optional(),
   status: z.enum(projectStatuses).default('Not Started'),
+  projectStageV2: z.enum(projectStageV2Values).nullable().optional(),
   plannedEndDate: dateField(),
   revisedEndDate: dateField(),
   delayReason: textField(),
@@ -77,6 +85,7 @@ export const createProjectSchema = z.object({
   priority: z.enum(priorities).nullable().optional(),
   sanctionedCostCr: numericField(),
   aaAmountCr: numericField(),
+  revisedAaAmountCr: numericField(),
   agreementAmountCr: numericField(),
   physicalProgressPct: percentField(),
   financialProgressCr: numericField(),

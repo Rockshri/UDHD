@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useLogoutMutation } from '../../app/api/authApi';
-import { useAppSelector } from '../../app/hooks';
-import { selectCurrentUser } from '../../features/auth/authSlice';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import {
+  openMdBriefing,
+  selectCurrentUser,
+} from '../../features/auth/authSlice';
 import { cn } from '../../lib/utils';
 import { RoleGate } from '../auth/RoleGate';
 import { BuidcoLogo } from './BuidcoLogo';
@@ -22,14 +25,17 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/sectors', label: 'Sector' },
   { to: '/projects', label: 'Projects' },
   { to: '/districts', label: 'Districts' },
+  { to: '/divisions', label: 'Divisions' },
   { to: '/cos-eot', label: 'CoS / EoT' },
   { to: '/management-actions', label: 'Management Action' },
   { to: '/gaps', label: 'Outstanding Gaps' },
   { to: '/pre-monsoon', label: 'Pre-Monsoon Prep' },
 ];
 
-const UTILITY_NAV: NavItem[] = [
+const UTILITY_NAV_BEFORE_MOM: NavItem[] = [
   { to: '/input-sheet', label: 'Input Sheet', icon: '📋' },
+];
+const UTILITY_NAV_MOM_ONWARDS: NavItem[] = [
   { to: '/mom', label: 'MoM', icon: '📅' },
   { to: '/om', label: 'O&M', icon: '🔧' },
 ];
@@ -52,6 +58,7 @@ const utilityLinkClass = ({ isActive }: { isActive: boolean }): string =>
 
 export function TopNav(): JSX.Element {
   const user = useAppSelector(selectCurrentUser);
+  const dispatch = useAppDispatch();
   const [logout, { isLoading: loggingOut }] = useLogoutMutation();
   const navigate = useNavigate();
   const [kpiOpen, setKpiOpen] = useState(false);
@@ -82,7 +89,23 @@ export function TopNav(): JSX.Element {
         </div>
 
         <nav className="ml-auto flex flex-shrink-0 items-center gap-1.5" aria-label="Utility navigation">
-          {UTILITY_NAV.map((item) => (
+          {UTILITY_NAV_BEFORE_MOM.map((item) => (
+            <NavLink key={item.to} to={item.to} className={utilityLinkClass}>
+              {item.icon && <span className="text-[13px]" aria-hidden>{item.icon}</span>}
+              {item.label}
+            </NavLink>
+          ))}
+          <RoleGate allow={['MD']}>
+            <button
+              type="button"
+              onClick={() => dispatch(openMdBriefing())}
+              title="Open MD Portfolio Briefing"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-[#1E3A5F] bg-[#1E3A5F] px-2.5 py-1.5 text-[11.5px] font-bold text-white transition-colors hover:bg-[#162B47]"
+            >
+              <span aria-hidden>📊</span> MD Portfolio Briefing
+            </button>
+          </RoleGate>
+          {UTILITY_NAV_MOM_ONWARDS.map((item) => (
             <NavLink key={item.to} to={item.to} className={utilityLinkClass}>
               {item.icon && <span className="text-[13px]" aria-hidden>{item.icon}</span>}
               {item.label}

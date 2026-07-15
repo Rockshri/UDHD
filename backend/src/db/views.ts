@@ -155,6 +155,22 @@ export const vSchemeSummary = pgView('v_scheme_summary', {
   delayed: integer('delayed'),
 }).existing();
 
+export const vSchemeKpiSummary = pgView('v_scheme_kpi_summary', {
+  schemeId: integer('scheme_id').notNull(),
+  schemeName: varchar('scheme_name', { length: 60 }).notNull(),
+  total: integer('total'),
+  completed: integer('completed'),
+  inProgress: integer('in_progress'),
+  delayed: integer('delayed'),
+  onHold: integer('on_hold'),
+  notStarted: integer('not_started'),
+  avgPhysicalPct: numeric('avg_physical_pct', { precision: 6, scale: 1 }),
+  avgFinancialPct: numeric('avg_financial_pct', { precision: 6, scale: 1 }),
+  totalAaCr: numeric('total_aa_cr', { precision: 14, scale: 2 }),
+  totalFinancialCr: numeric('total_financial_cr', { precision: 14, scale: 2 }),
+  financialUtilisationPct: numeric('financial_utilisation_pct', { precision: 6, scale: 1 }),
+}).existing();
+
 export const vSectorSummary = pgView('v_sector_summary', {
   sectorId: integer('sector_id').notNull(),
   sectorName: varchar('sector_name', { length: 40 }).notNull(),
@@ -171,6 +187,28 @@ export const vDistrictSummary = pgView('v_district_summary', {
   completed: integer('completed'),
   delayed: integer('delayed'),
   completionRatePct: numeric('completion_rate_pct', { precision: 5, scale: 0 }),
+}).existing();
+
+export const vDivisionSummary = pgView('v_division_summary', {
+  divisionId: integer('division_id').notNull(),
+  divisionName: varchar('division_name', { length: 80 }).notNull(),
+  regionId: integer('region_id').notNull(),
+  regionName: varchar('region_name', { length: 60 }).notNull(),
+  total: integer('total'),
+  completed: integer('completed'),
+  inProgress: integer('in_progress'),
+  delayed: integer('delayed'),
+  completionRatePct: numeric('completion_rate_pct', { precision: 5, scale: 0 }),
+}).existing();
+
+export const vRegionSummary = pgView('v_region_summary', {
+  regionId: integer('region_id').notNull(),
+  regionName: varchar('region_name', { length: 60 }).notNull(),
+  divisionCount: integer('division_count'),
+  total: integer('total'),
+  completed: integer('completed'),
+  inProgress: integer('in_progress'),
+  delayed: integer('delayed'),
 }).existing();
 
 /* CoS/EoT + delay + management action + outstanding gap views */

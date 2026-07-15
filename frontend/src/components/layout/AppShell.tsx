@@ -1,8 +1,17 @@
 import { Outlet } from 'react-router-dom';
 import { BUIDCO_LOGO_URI } from '../../assets/buidcoLogo';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import {
+  dismissMdBriefing,
+  selectShowMdBriefing,
+} from '../../features/auth/authSlice';
+import { MdSchemeSummaryModal } from '../md/MdSchemeSummaryModal';
 import { TopNav } from './TopNav';
 
 export function AppShell(): JSX.Element {
+  const dispatch = useAppDispatch();
+  const showMdBriefing = useAppSelector(selectShowMdBriefing);
+
   return (
     <div className="relative min-h-screen bg-[#F4F6F9] font-sans text-[#111827]">
       {/* Faded BUIDCO watermark — same pattern as the reference JSX. */}
@@ -17,6 +26,10 @@ export function AppShell(): JSX.Element {
           <Outlet />
         </main>
       </div>
+      <MdSchemeSummaryModal
+        open={showMdBriefing}
+        onClose={() => dispatch(dismissMdBriefing())}
+      />
     </div>
   );
 }

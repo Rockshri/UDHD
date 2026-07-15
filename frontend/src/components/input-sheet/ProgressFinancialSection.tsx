@@ -10,8 +10,24 @@ interface Props {
   cosItems: CosEotItem[];
 }
 
+/**
+ * Sanctioned Cost auto-populate (Phase A §4.2):
+ *   Revised AA Amount, if available  →  otherwise AA Amount.
+ * The displayed value is derived at render time; the payload no longer sends
+ * a manually-entered `sanctionedCostCr` (see draftToPayload).
+ */
+function deriveSanctionedCost(draft: ProjectDraft): number | null {
+  return draft.revisedAaAmountCr ?? draft.aaAmountCr ?? null;
+}
+
 export function ProgressFinancialSection({ draft, setField, cosItems }: Props): JSX.Element {
   const totalEotDays = cosItems.reduce((sum, c) => sum + (c.eotDaysGranted ?? 0), 0);
+  const sanctionedCost = deriveSanctionedCost(draft);
+  const sanctionedSource = draft.revisedAaAmountCr !== null
+    ? 'from Revised AA'
+    : draft.aaAmountCr !== null
+      ? 'from AA Amount'
+      : 'set AA or Revised AA';
 
   return (
     <Card>
@@ -19,14 +35,12 @@ export function ProgressFinancialSection({ draft, setField, cosItems }: Props): 
         <FormSectionHeader
           num="03"
           title="Progress & Financial"
-          sub="CoS count and total EoT days are auto-derived from Section 04"
+          sub="Sanctioned Cost auto-fills from Revised AA (or AA). CoS totals derive from Section 04."
         />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <NumberField
-            label="Sanctioned Cost"
-            suffix="₹ Cr"
-            value={draft.sanctionedCostCr}
-            onChange={(v) => setField('sanctionedCostCr', v)}
+          <ReadOnlyMetric
+            label={`Sanctioned Cost (auto — ${sanctionedSource})`}
+            value={sanctionedCost !== null ? `₹ ${sanctionedCost.toFixed(2)} Cr` : '—'}
           />
           <NumberField
             label="Physical Progress % (Actual)"
@@ -59,6 +73,12 @@ export function ProgressFinancialSection({ draft, setField, cosItems }: Props): 
             suffix="₹ Cr"
             value={draft.aaAmountCr}
             onChange={(v) => setField('aaAmountCr', v)}
+          />
+          <NumberField
+            label="Revised AA Amount"
+            suffix="₹ Cr"
+            value={draft.revisedAaAmountCr}
+            onChange={(v) => setField('revisedAaAmountCr', v)}
           />
           <NumberField
             label="Agreement Amount"

@@ -13,8 +13,9 @@ interface Props {
 }
 
 const STATUSES = ['Not Started', 'In Progress', 'Completed', 'On Hold', 'Delayed'];
-const STAGES = ['Conceptualization', 'Pre-Tender', 'Tender', 'Construction', 'O&M'];
-const WORK_TYPES = ['Tender Work', 'Tender Service', 'Pre-Monsoon', 'Construction', 'Others'];
+// New Project Stage options (Phase A §3.2).
+const STAGES = ['Conceptualisation', 'Design', 'Pre-Tender', 'Tender', 'Construction', 'O&M', 'Other'];
+const CONTRACT_TYPES = ['Work Contract', 'Service Contract', 'O&M Contract', 'Others'];
 const PRIORITIES = ['High', 'Medium', 'Low', 'N/A'];
 
 export function ProjectsFilterBar({
@@ -39,7 +40,7 @@ export function ProjectsFilterBar({
         </label>
 
         <Select
-          label="Status"
+          label="Execution Status"
           value={filters.status}
           onChange={(v) => setFilter('status', v)}
           options={STATUSES}
@@ -51,10 +52,10 @@ export function ProjectsFilterBar({
           options={STAGES}
         />
         <Select
-          label="Work Type"
-          value={filters.workType}
-          onChange={(v) => setFilter('workType', v)}
-          options={WORK_TYPES}
+          label="Contract Type"
+          value={filters.contractType}
+          onChange={(v) => setFilter('contractType', v)}
+          options={CONTRACT_TYPES}
         />
         <Select
           label="Priority"
@@ -84,6 +85,31 @@ export function ProjectsFilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-1">
+        <Select
+          label="Region"
+          value={filters.regionId}
+          onChange={(v) => {
+            // Changing region resets division so the sub-filter doesn't
+            // point at a division outside the newly-picked region.
+            setFilter('regionId', v);
+            if (filters.divisionId) setFilter('divisionId', '');
+          }}
+          options={
+            lookups?.regions.map((r) => ({ value: String(r.regionId), label: r.regionName })) ?? []
+          }
+          compact
+        />
+        <Select
+          label="Division"
+          value={filters.divisionId}
+          onChange={(v) => setFilter('divisionId', v)}
+          options={
+            (lookups?.divisions ?? [])
+              .filter((d) => !filters.regionId || String(d.regionId) === filters.regionId)
+              .map((d) => ({ value: String(d.divisionId), label: d.divisionName }))
+          }
+          compact
+        />
         <Select
           label="Scheme"
           value={filters.schemeId}

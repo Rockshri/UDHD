@@ -19,7 +19,9 @@
  *     when possible; the original string always lands in
  *     `expected_completion_raw`.
  *
- * Usage:  npm run db:seed-projects
+ * Usage:
+ *   npm run db:seed-projects                    # seed everything (~300)
+ *   npm run db:seed-projects -- --limit 2       # seed only the first 2
  */
 
 import { randomUUID } from 'node:crypto';
@@ -372,13 +374,42 @@ async function seedOne(
   }
 }
 
+function parseLimitFlag(argv: string[]): number | null {
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--limit') {
+      const raw = argv[i + 1];
+      if (!raw) throw new Error('--limit requires a positive integer value');
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n <= 0) {
+        throw new Error(`--limit must be a positive integer, got "${raw}"`);
+      }
+      return n;
+    }
+    const arg = argv[i];
+    if (arg && arg.startsWith('--limit=')) {
+      const n = Number(arg.slice('--limit='.length));
+      if (!Number.isInteger(n) || n <= 0) {
+        throw new Error(`--limit must be a positive integer, got "${arg}"`);
+      }
+      return n;
+    }
+  }
+  return null;
+}
+
 async function run(): Promise<void> {
+  const limit = parseLimitFlag(process.argv.slice(2));
   const jsxPath = findJsxPath();
   process.stdout.write(`Reading ${jsxPath}\n`);
   const source = readFileSync(jsxPath, 'utf8');
   const arraySrc = extractSeedArrayLiteral(source);
-  const seeds = parseArrayLiteral(arraySrc);
-  process.stdout.write(`Parsed ${seeds.length} SEED_PROJECTS entries\n`);
+  const allSeeds = parseArrayLiteral(arraySrc);
+  process.stdout.write(`Parsed ${allSeeds.length} SEED_PROJECTS entries\n`);
+
+  const seeds = limit === null ? allSeeds : allSeeds.slice(0, limit);
+  if (limit !== null) {
+    process.stdout.write(`--limit ${limit}: will process the first ${seeds.length} entries only\n`);
+  }
 
   const lookups = await loadLookups();
 
