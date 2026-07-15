@@ -504,7 +504,12 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     const delayed = (delayQuery.data?.items ?? [])
       .filter((d) => visibleIds.has(d.projectId))
       .filter((d) => (d.uncoveredDelayDays ?? 0) > 0)
-      .sort((a, b) => (b.uncoveredDelayDays ?? 0) - (a.uncoveredDelayDays ?? 0));
+      .sort((a, b) => (b.uncoveredDelayDays ?? 0) - (a.uncoveredDelayDays ?? 0))
+      .map((d) => ({
+        projectId: d.projectId,
+        projectName: d.projectName ?? '—',
+        uncoveredDelayDays: d.uncoveredDelayDays,
+      }));
     if (delayed.length >= 3) return delayed.slice(0, 3);
     const highPri = projects
       .filter((p) => p.priority === 'High' && !delayed.some((d) => d.projectId === p.projectId))
@@ -513,15 +518,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
         projectName: p.projectName,
         uncoveredDelayDays: null as number | null,
       }));
-    const combined = [
-      ...delayed.map((d) => ({
-        projectId: d.projectId,
-        projectName: d.projectName ?? '—',
-        uncoveredDelayDays: d.uncoveredDelayDays,
-      })),
-      ...highPri,
-    ];
-    return combined.slice(0, 3);
+    return [...delayed, ...highPri].slice(0, 3);
   }, [kpiVis.needsAttention, projects, delayQuery.data]);
 
   // Picker filtering
@@ -877,7 +874,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                           on={c.locked ? true : colVis[c.key]}
                           onToggle={() => c.locked ? undefined : toggleCol(c.key)}
                           label={c.label}
-                          locked={c.locked}
+                          locked={!!c.locked}
                         />
                       ))}
                     </div>
@@ -1196,7 +1193,7 @@ function ProjectDetailsBody({
           value: p.remark ?? '—',
           fullWidth: true,
           preserveNewlines: true,
-          tone: p.remark ? 'warn' : undefined,
+          ...(p.remark ? { tone: 'warn' as const } : {}),
         };
       case 'agencyContractor':
         return { label: 'Name of Agency / Contractor', value: p.contractor ?? '—' };

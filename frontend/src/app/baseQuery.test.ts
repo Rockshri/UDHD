@@ -65,7 +65,7 @@ describe('baseQueryWithReauth', () => {
     const store = makeStore();
     store.dispatch(
       setCredentials({
-        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true },
+        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true, canViewProjects: true },
         accessToken: 'expired-token',
         accessTokenExpiresAt: '2026-07-04T00:00:00.000Z',
       }),
@@ -78,7 +78,7 @@ describe('baseQueryWithReauth', () => {
       // 2) /auth/refresh → 200 with a new token
       .mockResolvedValueOnce(
         jsonResponse(200, {
-          user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true },
+          user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true, canViewProjects: true },
           accessToken: 'fresh-token',
           accessTokenExpiresAt: '2026-07-04T01:00:00.000Z',
         }),
@@ -116,7 +116,7 @@ describe('baseQueryWithReauth', () => {
     const store = makeStore();
     store.dispatch(
       setCredentials({
-        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true },
+        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true, canViewProjects: true },
         accessToken: 'expired-token',
         accessTokenExpiresAt: '2026-07-04T00:00:00.000Z',
       }),
@@ -140,7 +140,7 @@ describe('baseQueryWithReauth', () => {
     const store = makeStore();
     store.dispatch(
       setCredentials({
-        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true },
+        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true, canViewProjects: true },
         accessToken: 'expired-token',
         accessTokenExpiresAt: '2026-07-04T00:00:00.000Z',
       }),
@@ -172,7 +172,7 @@ describe('baseQueryWithReauth', () => {
 
     refreshResolve(
       jsonResponse(200, {
-        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true },
+        user: { userId: 1, username: 'shri', role: 'MD', fullName: 'Shri', canCreateProjects: true, canUpdateProjects: true, canDeleteProjects: true, canViewProjects: true },
         accessToken: 'fresh-token',
         accessTokenExpiresAt: '2026-07-04T01:00:00.000Z',
       }),
