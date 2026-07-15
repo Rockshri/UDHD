@@ -17,6 +17,7 @@ const initial: AuthState = {
   accessToken: null,
   accessTokenExpiresAt: null,
   status: 'unknown',
+  showMdBriefing: false,
 };
 
 const credentials = {
@@ -28,6 +29,7 @@ const credentials = {
     canCreateProjects: true,
     canUpdateProjects: true,
     canDeleteProjects: true,
+    canViewProjects: true,
   },
   accessToken: 'eyJ.access.token',
   accessTokenExpiresAt: '2026-07-04T12:00:00.000Z',

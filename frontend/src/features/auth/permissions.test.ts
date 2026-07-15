@@ -9,7 +9,15 @@ import {
 
 function stateWith(overrides: Partial<AuthState['user'] & object> | null): { auth: AuthState } {
   if (overrides === null) {
-    return { auth: { user: null, accessToken: null, accessTokenExpiresAt: null, status: 'out' } };
+    return {
+      auth: {
+        user: null,
+        accessToken: null,
+        accessTokenExpiresAt: null,
+        status: 'out',
+        showMdBriefing: false,
+      },
+    };
   }
   return {
     auth: {
@@ -21,11 +29,13 @@ function stateWith(overrides: Partial<AuthState['user'] & object> | null): { aut
         canCreateProjects: false,
         canUpdateProjects: false,
         canDeleteProjects: false,
+        canViewProjects: false,
         ...overrides,
       },
       accessToken: 'tok',
       accessTokenExpiresAt: '2026-08-01T00:00:00.000Z',
       status: 'in',
+      showMdBriefing: false,
     },
   };
 }
