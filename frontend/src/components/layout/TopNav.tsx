@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { useLogoutMutation } from '../../app/api/authApi';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import {
@@ -12,25 +13,18 @@ import { BuidcoLogo } from './BuidcoLogo';
 import { KpiGuideDrawer } from './KpiGuideDrawer';
 import { NavClock } from './NavClock';
 
+/**
+ * The 10 primary-nav items moved into the left sidebar per Read.md §1.
+ * TopNav now only carries the utility pills (Input Sheet / MoM / O&M),
+ * MD-only chips (Audit Trail / Users / MD Briefing), KPI Guide, clock,
+ * and user pill — per user's chosen scoping.
+ */
 interface NavItem {
   to: string;
   label: string;
   icon?: string;
   end?: boolean;
 }
-
-const PRIMARY_NAV: NavItem[] = [
-  { to: '/', label: 'Overview', end: true },
-  { to: '/schemes', label: 'Schemes' },
-  { to: '/sectors', label: 'Sector' },
-  { to: '/projects', label: 'Projects' },
-  { to: '/districts', label: 'Districts' },
-  { to: '/divisions', label: 'Divisions' },
-  { to: '/cos-eot', label: 'CoS / EoT' },
-  { to: '/management-actions', label: 'Management Action' },
-  { to: '/gaps', label: 'Outstanding Gaps' },
-  { to: '/pre-monsoon', label: 'Pre-Monsoon Prep' },
-];
 
 const UTILITY_NAV_BEFORE_MOM: NavItem[] = [
   { to: '/input-sheet', label: 'Input Sheet', icon: '📋' },
@@ -40,14 +34,6 @@ const UTILITY_NAV_MOM_ONWARDS: NavItem[] = [
   { to: '/om', label: 'O&M', icon: '🔧' },
 ];
 
-const primaryLinkClass = ({ isActive }: { isActive: boolean }): string =>
-  cn(
-    'inline-flex items-center gap-1 whitespace-nowrap rounded px-2.5 py-1.5 text-[11.5px] transition-colors',
-    isActive
-      ? 'bg-[#1E3A5F] font-bold text-white'
-      : 'font-medium text-[#4B5563] hover:bg-[#F3F4F6]',
-  );
-
 const utilityLinkClass = ({ isActive }: { isActive: boolean }): string =>
   cn(
     'inline-flex items-center gap-1.5 whitespace-nowrap rounded px-2.5 py-1.5 text-[11.5px] transition-colors border',
@@ -56,7 +42,12 @@ const utilityLinkClass = ({ isActive }: { isActive: boolean }): string =>
       : 'border-[#E5E7EB] bg-white font-medium text-[#374151] hover:bg-[#F9FAFB]',
   );
 
-export function TopNav(): JSX.Element {
+interface TopNavProps {
+  /** Opens the mobile sidebar drawer (< lg only). */
+  onOpenMobileNav: () => void;
+}
+
+export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
   const user = useAppSelector(selectCurrentUser);
   const dispatch = useAppDispatch();
   const [logout, { isLoading: loggingOut }] = useLogoutMutation();
@@ -73,9 +64,17 @@ export function TopNav(): JSX.Element {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[#E5E7EB] bg-white shadow-[0_1px_5px_rgba(0,0,0,0.07)]">
-      {/* Row 1 — brand · utility tabs · audit · user pill */}
-      <div className="mx-auto flex h-[50px] max-w-[1600px] items-center gap-2 px-4">
+    <header className="sticky top-0 z-50 border-b border-[#E5E7EB] bg-white shadow-[0_1px_5px_rgba(0,0,0,0.07)]">
+      {/* Row 1 — hamburger (mobile) · brand · utility tabs · audit · user pill */}
+      <div className="mx-auto flex h-[50px] items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={onOpenMobileNav}
+          className="rounded-md p-1.5 text-[#374151] hover:bg-[#F3F4F6] lg:hidden"
+          aria-label="Open navigation"
+        >
+          <Menu size={20} />
+        </button>
         <div className="flex flex-shrink-0 items-center gap-2 border-r border-[#E5E7EB] pr-3">
           <BuidcoLogo size={32} />
           <div>
@@ -156,17 +155,7 @@ export function TopNav(): JSX.Element {
         </div>
       </div>
 
-      {/* Row 2 — primary nav */}
-      <nav
-        className="mx-auto flex min-h-[38px] max-w-[1600px] flex-wrap items-center gap-0.5 border-t border-[#F3F4F6] px-4"
-        aria-label="Primary navigation"
-      >
-        {PRIMARY_NAV.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.end ?? false} className={primaryLinkClass}>
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      {/* Primary navigation lives in the left sidebar (Read.md §1). */}
 
       <KpiGuideDrawer open={kpiOpen} onClose={() => setKpiOpen(false)} />
     </header>

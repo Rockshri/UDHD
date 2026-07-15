@@ -32,9 +32,19 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
     // Access-token claims already say who the user is + their role, but a
     // second DB lookup catches deactivated accounts within one access-token
     // TTL. If p95 latency here becomes an issue we can cache in Redis.
-    const user = await getUserById(userId);
+    const user = await getUserById(userId, { divisionId: payload.divisionId });
     if (!user) {
       throw new HttpError(401, 'UNAUTHENTICATED', 'User no longer exists or is inactive');
+    }
+    // Belt-and-braces: PDs must always have a divisionId in their token. If a
+    // token was minted before the role changed to PD (or vice-versa), fail
+    // fast rather than serving a broken session.
+    if (user.role === 'PD' && payload.divisionId === undefined) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'PD session missing division context');
+    }
+    if (user.role !== 'PD' && payload.divisionId !== undefined) {
+      // Non-PD tokens should not carry a divisionId — strip it defensively.
+      // (Doesn't reject; token is still valid, we just ignore the stale claim.)
     }
     req.user = {
       userId: user.userId,
@@ -44,6 +54,10 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
       canCreateProjects: user.canCreateProjects,
       canUpdateProjects: user.canUpdateProjects,
       canDeleteProjects: user.canDeleteProjects,
+      canViewProjects: user.canViewProjects,
+      ...(user.role === 'PD' && user.divisionId !== undefined
+        ? { divisionId: user.divisionId }
+        : {}),
     };
     next();
   } catch (err) {
@@ -103,7 +117,7 @@ export const requireMd = requireRole('MD');
  * bounded to a single access-token TTL (10 min).
  */
 
-type PermissionKey = 'canCreateProjects' | 'canUpdateProjects' | 'canDeleteProjects';
+type PermissionKey = 'canCreateProjects' | 'canUpdateProjects' | 'canDeleteProjects' | 'canViewProjects';
 
 function makeProjectPermissionGate(
   key: PermissionKey,
@@ -148,4 +162,9 @@ export const requireProjectDelete = makeProjectPermissionGate(
   'canDeleteProjects',
   'FORBIDDEN_DELETE',
   'delete',
+);
+export const requireProjectView = makeProjectPermissionGate(
+  'canViewProjects',
+  'FORBIDDEN_VIEW',
+  'view',
 );

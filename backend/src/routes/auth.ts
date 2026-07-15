@@ -11,6 +11,8 @@ export const authRouter = Router();
 const loginSchema = z.object({
   username: z.string().min(1).max(60),
   password: z.string().min(1).max(200),
+  /** Required only for PDs; step 2 of the 2-step PD login. */
+  divisionId: z.number().int().positive().optional(),
 });
 
 function ipKey(req: Request): string {
@@ -60,8 +62,20 @@ authRouter.post(
   async (req, res, next) => {
     try {
       const parsed = loginSchema.parse(req.body);
-      const result = await authService.login(parsed.username, parsed.password, req);
-      setSuccessResponse(res, result);
+      const outcome = await authService.login(
+        parsed.username,
+        parsed.password,
+        req,
+        parsed.divisionId,
+      );
+      if (outcome.kind === 'needsDivision') {
+        // Step 1 of PD login: credentials verified but division not yet
+        // picked. Return the available divisions; client re-POSTs with the
+        // chosen divisionId. No refresh cookie set until step 2.
+        res.json({ needsDivision: true, divisions: outcome.divisions });
+        return;
+      }
+      setSuccessResponse(res, outcome);
     } catch (err) {
       next(err);
     }

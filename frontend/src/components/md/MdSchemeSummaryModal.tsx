@@ -1,9 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
-import {
-  useGetDelayStatusQuery,
-  useGetSchemeKpiSummaryQuery,
-} from '../../app/api/kpisApi';
+import { useGetDelayStatusQuery } from '../../app/api/kpisApi';
 import { useGetProjectQuery, useListProjectsQuery } from '../../app/api/projectsApi';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
@@ -12,15 +9,33 @@ import { PbgAlertCell } from '../projects/PbgAlertCell';
 import { PriorityBadge } from '../projects/PriorityBadge';
 import { ProgressBar } from '../projects/ProgressBar';
 import { StatusBadge } from '../projects/StatusBadge';
-import type { ProjectDetail, ProjectListItem, SchemeKpiSummaryRow } from '../../types/api';
+import type { Lookups, ProjectDetail, ProjectListItem } from '../../types/api';
 import { cn } from '../../lib/utils';
 import { formatCurrencyCr, formatDate, formatPercent } from '../../lib/formatters';
 
-// ── Colour palette per scheme card (mirrors SchemesPage) ─────────────────────
-const SCHEME_COLORS = [
-  '#1E3A5F', '#2563EB', '#3B82F6', '#60A5FA',
-  '#93C5FD', '#A5B4FC', '#C7D2FE', '#7C3AED',
-];
+// ── Status filter options (mirrors projectStatuses enum on the backend) ─────
+const STATUS_OPTIONS = ['Not Started', 'In Progress', 'Completed', 'On Hold', 'Delayed'] as const;
+
+// ── Draggable divider bounds (per user's answer: min 320px each, 25–75%) ────
+const DIVIDER_MIN_PX = 320;
+const DIVIDER_MIN_PCT = 25;
+const DIVIDER_MAX_PCT = 75;
+const LS_DIVIDER_KEY = 'buidco_md_popup_divider_pct_v1';
+
+function loadDividerPct(): number {
+  try {
+    const raw = localStorage.getItem(LS_DIVIDER_KEY);
+    if (!raw) return 42;
+    const v = Number(raw);
+    if (!Number.isFinite(v) || v < DIVIDER_MIN_PCT || v > DIVIDER_MAX_PCT) return 42;
+    return v;
+  } catch {
+    return 42;
+  }
+}
+function saveDividerPct(v: number): void {
+  try { localStorage.setItem(LS_DIVIDER_KEY, String(v)); } catch { /* quota */ }
+}
 
 // ── Left-side KPI field catalog ──────────────────────────────────────────────
 type KpiKey =
@@ -263,10 +278,16 @@ interface Props {
 
 // ── Main component ───────────────────────────────────────────────────────────
 export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | null {
-  const kpiQuery      = useGetSchemeKpiSummaryQuery(undefined, { skip: !open });
   const lookupsQuery  = useGetLookupsQuery(undefined, { skip: !open });
 
-  const [activeSchemeId, setActiveSchemeId]   = useState<number | null>(null);
+  // Filter row — all four combine to narrow the project list AND the aggregate
+  // KPIs on the left (client-side aggregate of the visible list per user's
+  // answer to Q1 during spec review).
+  const [filterSchemeId,   setFilterSchemeId]   = useState<number | null>(null);
+  const [filterSectorId,   setFilterSectorId]   = useState<number | null>(null);
+  const [filterDivisionId, setFilterDivisionId] = useState<number | null>(null);
+  const [filterStatus,     setFilterStatus]     = useState<string | null>(null);
+
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [openPicker, setOpenPicker]           = useState<null | 'kpi' | 'cols' | 'proj'>(null);
   const [colSearch, setColSearch]             = useState('');
@@ -281,18 +302,31 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   const [projVis, setProjVis]                 = useState<Record<ProjectFieldKey, boolean>>(() =>
     loadVis(LS_PROJ_KEY, DEFAULT_PROJECT_VIS),
   );
+  const [leftPct, setLeftPct] = useState<number>(() => loadDividerPct());
+  const bodyRef  = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Project list for the active scheme — fetched only when a scheme is picked.
+  // Project list — server-filtered by the 4 filter dropdowns. Fetches
+  // whenever the modal is open (no more "select a scheme first" gate). Limit
+  // caps at the backend max (100). If more matched, the aggregate KPIs on
+  // the left panel reflect this visible slice — noted on the KPI header.
   const projectsQuery = useListProjectsQuery(
-    activeSchemeId ? { schemeId: activeSchemeId, limit: 100 } : { limit: 1 },
-    { skip: !open || activeSchemeId === null },
+    open
+      ? {
+          limit: 100,
+          ...(filterSchemeId   ? { schemeId:   filterSchemeId   } : {}),
+          ...(filterSectorId   ? { sectorId:   filterSectorId   } : {}),
+          ...(filterDivisionId ? { divisionId: filterDivisionId } : {}),
+          ...(filterStatus     ? { status:     filterStatus     } : {}),
+        }
+      : { limit: 1 },
+    { skip: !open },
   );
 
-  // Delay status — only fetched when the Needs-Attention insight is on AND a
-  // scheme is active, to keep the popup cheap on first open.
+  // Delay status — only fetched when the Needs-Attention insight is on.
   const delayQuery = useGetDelayStatusQuery(undefined, {
-    skip: !open || activeSchemeId === null || !kpiVis.needsAttention,
+    skip: !open || !kpiVis.needsAttention,
   });
 
   // Full ProjectDetail — needed for core fields (Name of Work, Agreement Number,
@@ -314,10 +348,57 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     return () => document.removeEventListener('keydown', handler);
   }, [open, openPicker, activeProjectId, onClose]);
 
-  // Switching scheme clears any drilled-in project.
+  // Any filter change clears the drilled-in project (it may have just been
+  // filtered out of view).
   useEffect(() => {
     setActiveProjectId(null);
-  }, [activeSchemeId]);
+  }, [filterSchemeId, filterSectorId, filterDivisionId, filterStatus]);
+
+  // ── Draggable divider handlers ──
+  const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent): void => {
+    e.preventDefault();
+    draggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const move = (clientX: number): void => {
+      if (!draggingRef.current || !bodyRef.current) return;
+      const rect = bodyRef.current.getBoundingClientRect();
+      const rawPct = ((clientX - rect.left) / rect.width) * 100;
+      // Enforce both the % swing (25–75) and the 320px minimum on each side.
+      const minPctFromPx = (DIVIDER_MIN_PX / rect.width) * 100;
+      const maxPctFromPx = 100 - minPctFromPx;
+      const min = Math.max(DIVIDER_MIN_PCT, minPctFromPx);
+      const max = Math.min(DIVIDER_MAX_PCT, maxPctFromPx);
+      const clamped = Math.min(max, Math.max(min, rawPct));
+      setLeftPct(clamped);
+    };
+    const onMouseMove = (e: MouseEvent): void => move(e.clientX);
+    const onTouchMove = (e: TouchEvent): void => {
+      const t = e.touches[0];
+      if (t) move(t.clientX);
+    };
+    const stop = (): void => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setLeftPct((v) => { saveDividerPct(v); return v; });
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup',   stop);
+    window.addEventListener('touchmove', onTouchMove);
+    window.addEventListener('touchend',  stop);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup',   stop);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend',  stop);
+    };
+  }, [open]);
 
   // ── Body scroll lock while modal is open ──
   useEffect(() => {
@@ -333,13 +414,14 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   }, [openPicker]);
 
   // ── Derived state ──
-  const schemes = kpiQuery.data?.items ?? [];
-  const active  = activeSchemeId ? schemes.find((s) => s.schemeId === activeSchemeId) ?? null : null;
-
   const projects = projectsQuery.data?.items ?? [];
   const activeProject = activeProjectId
     ? projects.find((p) => p.projectId === activeProjectId) ?? null
     : null;
+  const hasAnyFilter =
+    filterSchemeId !== null || filterSectorId !== null ||
+    filterDivisionId !== null || filterStatus !== null;
+  const hitCap = projects.length >= 100;
 
   const districtsById = useMemo(() => {
     const m = new Map<number, string>();
@@ -385,11 +467,42 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     });
   }, [projects]);
 
+  // Aggregate KPIs computed client-side from the currently-filtered project
+  // set (per user's answer to Q1). If the backend returned the max page
+  // (100 rows), aggregates cover that visible slice — flagged in the header.
+  const aggregate = useMemo(() => {
+    const avg = (nums: Array<number | null>): number | null => {
+      const clean = nums.filter((n): n is number => typeof n === 'number');
+      if (clean.length === 0) return null;
+      return Math.round((clean.reduce((s, n) => s + n, 0) / clean.length) * 10) / 10;
+    };
+    const sum = (nums: Array<number | null>): number =>
+      nums.reduce<number>((s, n) => s + (n ?? 0), 0);
+
+    const totalAa    = Math.round(sum(projects.map((p) => p.aaAmountCr)) * 100) / 100;
+    const totalSpent = Math.round(sum(projects.map((p) => p.financialProgressCr)) * 100) / 100;
+    return {
+      total:       projects.length,
+      completed:   projects.filter((p) => p.status === 'Completed').length,
+      inProgress:  projects.filter((p) => p.status === 'In Progress').length,
+      delayed:     projects.filter((p) => p.status === 'Delayed').length,
+      onHold:      projects.filter((p) => p.status === 'On Hold').length,
+      notStarted:  projects.filter((p) => p.status === 'Not Started').length,
+      avgPhysicalPct: avg(projects.map((p) => p.effectivePhysicalPct ?? p.physicalProgressPct)),
+      avgFinancialPct: avg(projects.map((p) => p.financialProgressPct)),
+      financialUtilisationPct: totalAa > 0
+        ? Math.round((totalSpent / totalAa) * 1000) / 10
+        : null,
+      totalAaCr: totalAa,
+      totalFinancialCr: totalSpent,
+    };
+  }, [projects]);
+
   const needsAttentionList = useMemo(() => {
-    if (!kpiVis.needsAttention || activeSchemeId === null) return [];
-    const schemeProjectIds = new Set(projects.map((p) => p.projectId));
+    if (!kpiVis.needsAttention) return [];
+    const visibleIds = new Set(projects.map((p) => p.projectId));
     const delayed = (delayQuery.data?.items ?? [])
-      .filter((d) => schemeProjectIds.has(d.projectId))
+      .filter((d) => visibleIds.has(d.projectId))
       .filter((d) => (d.uncoveredDelayDays ?? 0) > 0)
       .sort((a, b) => (b.uncoveredDelayDays ?? 0) - (a.uncoveredDelayDays ?? 0));
     if (delayed.length >= 3) return delayed.slice(0, 3);
@@ -409,7 +522,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
       ...highPri,
     ];
     return combined.slice(0, 3);
-  }, [kpiVis.needsAttention, activeSchemeId, projects, delayQuery.data]);
+  }, [kpiVis.needsAttention, projects, delayQuery.data]);
 
   // Picker filtering
   const filteredKpiGroups = KPI_GROUPS
@@ -521,13 +634,24 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
           </div>
         </header>
 
-        {/* ── Body: two panels — each is its own contained scroll area ─── */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,_5fr)_minmax(0,_7fr)]">
-          {/* LEFT — KPI Summary OR active-project details */}
-          <section className="flex min-h-0 min-w-0 flex-col border-b border-[#E5E7EB] lg:border-b-0 lg:border-r">
+        {/* ── Body: two panels — resizable via draggable divider on lg+ ─── */}
+        <div
+          ref={bodyRef}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row"
+          style={{ ['--left-pct' as string]: `${leftPct}%` } as React.CSSProperties}
+        >
+          {/* LEFT — Portfolio KPIs OR active-project details */}
+          <section
+            className="flex min-h-0 min-w-0 shrink-0 flex-col border-b border-[#E5E7EB] lg:border-b-0 lg:w-[var(--left-pct)]"
+            data-panel="left"
+          >
             <div className="flex shrink-0 items-center justify-between border-b border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5">
               <span className="truncate text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">
-                {activeProject ? 'Project Snapshot' : 'Scheme KPIs'}
+                {activeProject
+                  ? 'Project Snapshot'
+                  : hasAnyFilter
+                    ? `Portfolio KPIs · Filtered${hitCap ? ' (top 100)' : ''}`
+                    : 'Portfolio KPIs · All Projects'}
               </span>
               <div className="flex shrink-0 items-center gap-1.5">
                 {activeProject ? (
@@ -647,7 +771,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
               />
             ) : null}
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
               {activeProject ? (
                 <ProjectDetailsBody
                   listItem={activeProject}
@@ -659,13 +783,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                   sectorsById={sectorsById}
                   schemesById={schemesById}
                 />
-              ) : activeSchemeId === null ? (
-                <EmptyPanelState
-                  icon="👉"
-                  title="Select a scheme"
-                  hint="Pick any scheme on the right to see its portfolio KPIs here."
-                />
-              ) : kpiQuery.isLoading || !active ? (
+              ) : projectsQuery.isLoading ? (
                 <div className="space-y-3">
                   <Skeleton className="h-20 w-full" />
                   <Skeleton className="h-14 w-full" />
@@ -678,9 +796,11 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                   hint="Open the Fields picker above and turn some on."
                 />
               ) : (
-                <SchemeKpiBody
-                  active={active}
+                <PortfolioKpiBody
+                  aggregate={aggregate}
                   vis={kpiVis}
+                  hasAnyFilter={hasAnyFilter}
+                  hitCap={hitCap}
                   needsAttentionList={needsAttentionList}
                   needsAttentionLoading={
                     kpiVis.needsAttention && (projectsQuery.isLoading || delayQuery.isLoading)
@@ -690,11 +810,36 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
             </div>
           </section>
 
-          {/* RIGHT — Scheme selector (fixed) + project list (scrolls) */}
-          <section className="flex min-h-0 min-w-0 flex-col">
+          {/* ── Drag divider (desktop only) ─────────────────────────────── */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize panels"
+            tabIndex={0}
+            onMouseDown={onDragStart}
+            onTouchStart={onDragStart}
+            onKeyDown={(e) => {
+              // Keyboard resize: ←/→ nudges 2% at a time (Home/End = min/max).
+              const step = e.shiftKey ? 5 : 2;
+              if (e.key === 'ArrowLeft')  { e.preventDefault(); setLeftPct((v) => { const n = Math.max(DIVIDER_MIN_PCT, v - step); saveDividerPct(n); return n; }); }
+              if (e.key === 'ArrowRight') { e.preventDefault(); setLeftPct((v) => { const n = Math.min(DIVIDER_MAX_PCT, v + step); saveDividerPct(n); return n; }); }
+              if (e.key === 'Home')       { e.preventDefault(); setLeftPct(() => { saveDividerPct(DIVIDER_MIN_PCT); return DIVIDER_MIN_PCT; }); }
+              if (e.key === 'End')        { e.preventDefault(); setLeftPct(() => { saveDividerPct(DIVIDER_MAX_PCT); return DIVIDER_MAX_PCT; }); }
+            }}
+            className="group relative hidden shrink-0 cursor-col-resize items-center justify-center bg-[#E5E7EB] transition-colors hover:bg-[#93C5FD] focus:bg-[#93C5FD] focus:outline-none lg:flex lg:w-[6px]"
+            title="Drag to resize"
+          >
+            {/* Grip dots on hover */}
+            <span className="pointer-events-none absolute inset-y-0 left-1/2 hidden -translate-x-1/2 items-center gap-[2px] group-hover:flex group-focus:flex">
+              <span className="h-4 w-[2px] rounded bg-white/90" />
+            </span>
+          </div>
+
+          {/* RIGHT — Filter row + project list */}
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between border-b border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5">
               <span className="truncate text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">
-                Schemes {schemes.length ? `· ${schemes.length}` : ''}
+                Projects {projects.length > 0 ? `· ${projects.length}${hitCap ? '+' : ''}` : ''}
               </span>
               <button
                 type="button"
@@ -741,45 +886,33 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
               />
             ) : null}
 
-            {/* Scheme chip grid — fixed above scroll */}
-            <div className="shrink-0 border-b border-[#E5E7EB] px-4 py-3">
-              {kpiQuery.isLoading ? (
-                <Skeleton className="h-24 w-full" />
-              ) : schemes.length === 0 ? (
-                <p className="text-[12px] text-[#6B7280]">No schemes configured.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {schemes.map((s, idx) => (
-                    <SchemeChip
-                      key={s.schemeId}
-                      name={s.schemeName}
-                      total={s.total}
-                      color={SCHEME_COLORS[idx % SCHEME_COLORS.length] ?? '#1E3A5F'}
-                      active={activeSchemeId === s.schemeId}
-                      onClick={() =>
-                        setActiveSchemeId(activeSchemeId === s.schemeId ? null : s.schemeId)
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Filter row — Scheme, Sector, Division, Status */}
+            <FilterRow
+              lookups={lookupsQuery.data}
+              filterSchemeId={filterSchemeId}
+              filterSectorId={filterSectorId}
+              filterDivisionId={filterDivisionId}
+              filterStatus={filterStatus}
+              onSchemeChange={setFilterSchemeId}
+              onSectorChange={setFilterSectorId}
+              onDivisionChange={setFilterDivisionId}
+              onStatusChange={setFilterStatus}
+              onClearAll={() => {
+                setFilterSchemeId(null); setFilterSectorId(null);
+                setFilterDivisionId(null); setFilterStatus(null);
+              }}
+              hasAnyFilter={hasAnyFilter}
+            />
 
-            {/* Project list for active scheme — scrolls both axes inside */}
+            {/* Project list — scrolls both axes inside */}
             <div className="min-h-0 flex-1 overflow-auto p-3">
-              {activeSchemeId === null ? (
-                <EmptyPanelState
-                  icon="⬆️"
-                  title="Select a scheme above"
-                  hint="Its project list will appear here."
-                />
-              ) : projectsQuery.isLoading ? (
+              {projectsQuery.isLoading ? (
                 <Skeleton className="h-40 w-full" />
               ) : sortedProjects.length === 0 ? (
                 <EmptyPanelState
                   icon="📄"
                   title="No projects"
-                  hint="This scheme has no projects yet."
+                  hint={hasAnyFilter ? 'No projects match the current filters.' : 'No projects in the register.'}
                 />
               ) : (
                 <ProjectList
@@ -802,23 +935,41 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
 }
 
 // ── LEFT panel body ──────────────────────────────────────────────────────────
-function SchemeKpiBody({
-  active, vis, needsAttentionList, needsAttentionLoading,
+interface AggregateKpis {
+  total: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+  onHold: number;
+  notStarted: number;
+  avgPhysicalPct: number | null;
+  avgFinancialPct: number | null;
+  financialUtilisationPct: number | null;
+  totalAaCr: number;
+  totalFinancialCr: number;
+}
+
+function PortfolioKpiBody({
+  aggregate, vis, hasAnyFilter, hitCap, needsAttentionList, needsAttentionLoading,
 }: {
-  active: SchemeKpiSummaryRow;
+  aggregate: AggregateKpis;
   vis: Record<KpiKey, boolean>;
+  hasAnyFilter: boolean;
+  hitCap: boolean;
   needsAttentionList: Array<{ projectId: string; projectName: string; uncoveredDelayDays: number | null }>;
   needsAttentionLoading: boolean;
 }): JSX.Element {
   const statusKeys: Array<{ k: KpiKey; label: string; value: number; tone: string }> = [
-    { k: 'total',      label: 'Total',       value: active.total,      tone: 'brand'   },
-    { k: 'completed',  label: 'Completed',   value: active.completed,  tone: 'success' },
-    { k: 'inProgress', label: 'In Progress', value: active.inProgress, tone: 'info'    },
-    { k: 'delayed',    label: 'Delayed',     value: active.delayed,    tone: 'danger'  },
-    { k: 'onHold',     label: 'On Hold',     value: active.onHold,     tone: 'muted'   },
-    { k: 'notStarted', label: 'Not Started', value: active.notStarted, tone: 'amber'   },
+    { k: 'total',      label: 'Total',       value: aggregate.total,      tone: 'brand'   },
+    { k: 'completed',  label: 'Completed',   value: aggregate.completed,  tone: 'success' },
+    { k: 'inProgress', label: 'In Progress', value: aggregate.inProgress, tone: 'info'    },
+    { k: 'delayed',    label: 'Delayed',     value: aggregate.delayed,    tone: 'danger'  },
+    { k: 'onHold',     label: 'On Hold',     value: aggregate.onHold,     tone: 'muted'   },
+    { k: 'notStarted', label: 'Not Started', value: aggregate.notStarted, tone: 'amber'   },
   ];
   const visibleStatuses = statusKeys.filter((s) => vis[s.k]);
+  // Alias `aggregate` → `active` for the field bodies below to minimise churn.
+  const active = aggregate;
 
   const showProgress =
     vis.avgPhysicalPct || vis.avgFinancialPct || vis.financialUtilisationPct;
@@ -827,12 +978,15 @@ function SchemeKpiBody({
 
   return (
     <div className="space-y-4">
-      {/* Scheme name header (fixed chrome — always shown) */}
+      {/* Header — reflects filter state (fixed chrome, always shown) */}
       <div>
         <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-          Active Scheme
+          {hasAnyFilter ? 'Filtered Portfolio' : 'Full Portfolio'}
         </p>
-        <h3 className="text-[15px] font-bold text-[#111827]">{active.schemeName}</h3>
+        <h3 className="text-[15px] font-bold text-[#111827]">
+          {aggregate.total} project{aggregate.total === 1 ? '' : 's'}
+          {hitCap ? ' (showing top 100)' : ''}
+        </h3>
       </div>
 
       {/* Status Breakdown */}
@@ -1105,16 +1259,16 @@ function ProjectDetailsBody({
     .filter((r): r is { key: ProjectFieldKey; out: FieldOutput } => r.out !== null);
 
   return (
-    <div className="space-y-4">
-      {/* Fixed chrome — project name + badges — always shown */}
-      <div className="min-w-0">
-        <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
+    <div className="space-y-5">
+      {/* Fixed chrome — project name + badges — always shown (§2 polish) */}
+      <div className="min-w-0 border-b border-[#E5E7EB] pb-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">
           Selected Project
         </p>
-        <h3 className="mt-0.5 break-words text-[15px] font-bold text-[#111827]">
+        <h3 className="mt-1 break-words text-[19px] font-extrabold leading-tight text-[#111827]">
           {p.projectName}
         </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <StatusBadge status={p.status} />
           <PriorityBadge priority={p.priority} />
         </div>
@@ -1127,11 +1281,13 @@ function ProjectDetailsBody({
           hint="Open the Fields picker above and turn some on."
         />
       ) : (
-        <div className="rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-sm">
-          <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
+        <div className="rounded-lg border border-[#E5E7EB] bg-white p-5 shadow-sm">
+          <p className="mb-4 border-b border-[#F3F4F6] pb-2 text-[11.5px] font-bold uppercase tracking-wider text-[#1E3A5F]">
             Project Details
           </p>
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+          {/* Bigger, roomier grid — 1 col on narrow, 2 on ≥md, 3 on ≥xl for the
+              wider desktop briefing panel (§2). fullWidth fields still span. */}
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2 xl:grid-cols-3">
             {visibleFields.map(({ key, out }) => (
               <FieldRow key={key} field={out} />
             ))}
@@ -1152,14 +1308,19 @@ interface FieldOutput {
 
 function FieldRow({ field }: { field: FieldOutput }): JSX.Element {
   const valueClass = cn(
-    'text-[12.5px] leading-relaxed text-[#111827]',
+    'text-[13.5px] leading-relaxed text-[#111827]',
     field.preserveNewlines && 'whitespace-pre-wrap break-words',
-    field.tone === 'strong' && 'text-[14px] font-bold tabular-nums text-[#1E3A5F]',
+    field.tone === 'strong' && 'text-[15.5px] font-bold tabular-nums text-[#1E3A5F]',
     field.tone === 'warn'   && 'font-semibold text-[#B91C1C]',
   );
   return (
-    <div className={cn('min-w-0', field.fullWidth && 'sm:col-span-2')}>
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-[#6B7280]">
+    <div
+      className={cn(
+        'min-w-0 rounded-md bg-[#F9FAFB] px-3 py-2.5',
+        field.fullWidth && 'md:col-span-2 xl:col-span-3',
+      )}
+    >
+      <dt className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
         {field.label}
       </dt>
       <dd className={valueClass}>{field.value}</dd>
@@ -1169,8 +1330,8 @@ function FieldRow({ field }: { field: FieldOutput }): JSX.Element {
 
 function ProgressCell({ value, color }: { value: number | null | undefined; color: string }): JSX.Element {
   return (
-    <div className="flex items-center gap-2">
-      <span className="min-w-[46px] text-[12.5px] font-bold tabular-nums text-[#111827]">
+    <div className="flex items-center gap-2.5">
+      <span className="min-w-[50px] text-[13.5px] font-bold tabular-nums text-[#111827]">
         {formatPercent(value)}
       </span>
       <div className="flex-1"><ProgressBar value={value} color={color} showLabel={false} /></div>
@@ -1283,39 +1444,99 @@ function ProgressRow({ label, value, color }: {
   );
 }
 
-function SchemeChip({ name, total, color, active, onClick }: {
-  name: string; total: number; color: string; active: boolean; onClick: () => void;
+// ── FilterRow — Scheme / Sector / Division / Status dropdowns ───────────────
+function FilterRow({
+  lookups, filterSchemeId, filterSectorId, filterDivisionId, filterStatus,
+  onSchemeChange, onSectorChange, onDivisionChange, onStatusChange,
+  onClearAll, hasAnyFilter,
+}: {
+  lookups: Lookups | undefined;
+  filterSchemeId: number | null;
+  filterSectorId: number | null;
+  filterDivisionId: number | null;
+  filterStatus: string | null;
+  onSchemeChange:   (v: number | null) => void;
+  onSectorChange:   (v: number | null) => void;
+  onDivisionChange: (v: number | null) => void;
+  onStatusChange:   (v: string | null) => void;
+  onClearAll: () => void;
+  hasAnyFilter: boolean;
+}): JSX.Element {
+  const schemes   = lookups?.schemes   ?? [];
+  const sectors   = lookups?.sectors   ?? [];
+  const divisions = lookups?.divisions ?? [];
+  return (
+    <div className="shrink-0 border-b border-[#E5E7EB] bg-white px-4 py-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <FilterSelect
+          label="Scheme"
+          value={filterSchemeId === null ? '' : String(filterSchemeId)}
+          onChange={(v) => onSchemeChange(v ? Number(v) : null)}
+          options={schemes.map((s) => ({ value: String(s.schemeId), label: s.schemeName }))}
+        />
+        <FilterSelect
+          label="Sector"
+          value={filterSectorId === null ? '' : String(filterSectorId)}
+          onChange={(v) => onSectorChange(v ? Number(v) : null)}
+          options={sectors.map((s) => ({ value: String(s.sectorId), label: s.sectorName }))}
+        />
+        <FilterSelect
+          label="Division"
+          value={filterDivisionId === null ? '' : String(filterDivisionId)}
+          onChange={(v) => onDivisionChange(v ? Number(v) : null)}
+          options={divisions.map((d) => ({ value: String(d.divisionId), label: d.divisionName }))}
+        />
+        <FilterSelect
+          label="Status"
+          value={filterStatus ?? ''}
+          onChange={(v) => onStatusChange(v || null)}
+          options={STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
+        />
+        <button
+          type="button"
+          onClick={onClearAll}
+          disabled={!hasAnyFilter}
+          className={cn(
+            'ml-auto self-end rounded-md border px-2.5 py-1.5 text-[11px] font-semibold transition-colors',
+            hasAnyFilter
+              ? 'border-[#FCA5A5] bg-white text-[#B91C1C] hover:bg-[#FEF2F2]'
+              : 'cursor-not-allowed border-[#E5E7EB] bg-[#F9FAFB] text-[#9CA3AF]',
+          )}
+        >
+          Clear all
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FilterSelect({
+  label, value, onChange, options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
 }): JSX.Element {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'flex flex-col items-start rounded-lg border p-2.5 text-left shadow-sm transition-all',
-        active
-          ? 'border-[#1E3A5F] bg-[#1E3A5F] text-white'
-          : 'border-[#E5E7EB] bg-white hover:-translate-y-0.5 hover:shadow-md',
-      )}
-    >
-      <span
+    <label className="grid min-w-[140px] max-w-[220px] flex-1 gap-1">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7280]">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'text-[11.5px] font-bold leading-tight',
-          active ? 'text-white' : 'text-[#111827]',
+          'h-9 w-full rounded-md border border-[#D1D5DB] bg-white px-2 text-[12.5px] text-[#111827]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A5F] focus-visible:ring-offset-1',
         )}
       >
-        {name}
-      </span>
-      <span
-        className={cn(
-          'mt-0.5 text-[11px] font-semibold tabular-nums',
-          active ? 'text-[#93C5FD]' : 'text-[#6B7280]',
-        )}
-        style={active ? undefined : { color }}
-      >
-        {total} project{total === 1 ? '' : 's'}
-      </span>
-    </button>
+        <option value="">All</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

@@ -2,7 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import type { Request } from 'express';
 import { db } from '../db/client.js';
 import type { UserRole } from '../db/enums.js';
-import { appUser, refreshToken } from '../db/schema.js';
+import { appUser, division, refreshToken, userDivision } from '../db/schema.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { verifyPassword } from '../lib/passwords.js';
 import {
@@ -22,13 +22,25 @@ export interface AuthenticatedUser {
   canCreateProjects: boolean;
   canUpdateProjects: boolean;
   canDeleteProjects: boolean;
+  canViewProjects: boolean;
+  /** PD's chosen division for this session; undefined for other roles. */
+  divisionId?: number;
 }
 
-export interface LoginResult {
+export interface LoginComplete {
+  kind: 'complete';
   user: AuthenticatedUser;
   access: SignedAccessToken;
   refresh: SignedRefreshToken;
 }
+
+export interface LoginNeedsDivision {
+  kind: 'needsDivision';
+  /** Divisions this PD is assigned to — client shows a picker; user re-POSTs. */
+  divisions: Array<{ divisionId: number; divisionName: string }>;
+}
+
+export type LoginOutcome = LoginComplete | LoginNeedsDivision;
 
 function requestFingerprint(req: Request): { userAgent: string | null; ip: string | null } {
   const ua = req.get('user-agent') ?? null;
@@ -40,6 +52,7 @@ async function persistRefreshToken(
   userId: number,
   refresh: SignedRefreshToken,
   req: Request,
+  selectedDivisionId: number | null,
 ): Promise<void> {
   const { userAgent, ip } = requestFingerprint(req);
   await db.insert(refreshToken).values({
@@ -49,14 +62,30 @@ async function persistRefreshToken(
     expiresAt: refresh.expiresAt,
     userAgent,
     ipAddress: ip,
+    selectedDivisionId,
   });
+}
+
+async function fetchAssignedDivisions(
+  userId: number,
+): Promise<Array<{ divisionId: number; divisionName: string }>> {
+  return db
+    .select({
+      divisionId: division.divisionId,
+      divisionName: division.divisionName,
+    })
+    .from(userDivision)
+    .innerJoin(division, eq(division.divisionId, userDivision.divisionId))
+    .where(eq(userDivision.userId, userId))
+    .orderBy(division.divisionName);
 }
 
 export async function login(
   username: string,
   password: string,
   req: Request,
-): Promise<LoginResult> {
+  divisionId: number | undefined,
+): Promise<LoginOutcome> {
   const [row] = await db
     .select()
     .from(appUser)
@@ -72,33 +101,70 @@ export async function login(
     throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid username or password');
   }
 
+  const role = row.role as UserRole;
+  let sessionDivisionId: number | null = null;
+
+  if (role === 'PD') {
+    const assigned = await fetchAssignedDivisions(row.userId);
+    if (assigned.length === 0) {
+      throw new HttpError(
+        403,
+        'PD_NO_DIVISIONS',
+        'This Project Director has no divisions assigned. Ask an Admin to assign one.',
+      );
+    }
+    if (divisionId === undefined) {
+      // First step of the 2-step PD login — client shows the picker, then
+      // re-POSTs with the chosen divisionId. No JWT issued yet.
+      return { kind: 'needsDivision', divisions: assigned };
+    }
+    const match = assigned.find((d) => d.divisionId === divisionId);
+    if (!match) {
+      throw new HttpError(
+        403,
+        'DIVISION_NOT_ASSIGNED',
+        'The selected division is not assigned to this account.',
+      );
+    }
+    sessionDivisionId = divisionId;
+  }
+  // For non-PD roles, divisionId (if provided) is silently ignored.
+
   await db.update(appUser).set({ lastLogin: new Date() }).where(eq(appUser.userId, row.userId));
 
   const user: AuthenticatedUser = {
     userId: row.userId,
     username: row.username,
-    role: row.role as UserRole,
+    role,
     fullName: row.fullName,
     canCreateProjects: row.canCreateProjects,
     canUpdateProjects: row.canUpdateProjects,
     canDeleteProjects: row.canDeleteProjects,
+    canViewProjects: row.canViewProjects,
+    ...(sessionDivisionId !== null ? { divisionId: sessionDivisionId } : {}),
   };
 
   const access = signAccessToken({
     sub: String(user.userId),
     role: user.role,
     name: user.fullName ?? user.username,
+    ...(sessionDivisionId !== null ? { divisionId: sessionDivisionId } : {}),
   });
   const refresh = await signRefreshToken(user.userId);
-  await persistRefreshToken(user.userId, refresh, req);
+  await persistRefreshToken(user.userId, refresh, req, sessionDivisionId);
 
-  return { user, access, refresh };
+  return { kind: 'complete', user, access, refresh };
 }
 
 export interface RefreshResult {
   user: AuthenticatedUser;
   access: SignedAccessToken;
   refresh: SignedRefreshToken;
+}
+
+/** Callers pass just the sub identifier; getUserById is the source of truth. */
+export interface GetUserOptions {
+  divisionId?: number | undefined;
 }
 
 export async function refresh(cookieValue: string, req: Request): Promise<RefreshResult> {
@@ -146,6 +212,8 @@ export async function refresh(cookieValue: string, req: Request): Promise<Refres
     throw new HttpError(401, 'USER_INACTIVE', 'User account is inactive');
   }
 
+  // PD sessions carry over the selected division so refreshes don't drop it.
+  const preservedDivisionId = row.selectedDivisionId ?? null;
   const nextRefresh = await signRefreshToken(userRow.userId);
 
   await db.transaction(async (tx) => {
@@ -156,6 +224,7 @@ export async function refresh(cookieValue: string, req: Request): Promise<Refres
       expiresAt: nextRefresh.expiresAt,
       userAgent: req.get('user-agent') ?? null,
       ipAddress: req.ip ?? null,
+      selectedDivisionId: preservedDivisionId,
     });
     await tx
       .update(refreshToken)
@@ -171,12 +240,15 @@ export async function refresh(cookieValue: string, req: Request): Promise<Refres
     canCreateProjects: userRow.canCreateProjects,
     canUpdateProjects: userRow.canUpdateProjects,
     canDeleteProjects: userRow.canDeleteProjects,
+    canViewProjects: userRow.canViewProjects,
+    ...(preservedDivisionId !== null ? { divisionId: preservedDivisionId } : {}),
   };
 
   const access = signAccessToken({
     sub: String(user.userId),
     role: user.role,
     name: user.fullName ?? user.username,
+    ...(preservedDivisionId !== null ? { divisionId: preservedDivisionId } : {}),
   });
 
   return { user, access, refresh: nextRefresh };
@@ -196,7 +268,10 @@ export async function logout(cookieValue: string | undefined): Promise<void> {
     .where(and(eq(refreshToken.tokenId, parsed.payload.jti), isNull(refreshToken.revokedAt)));
 }
 
-export async function getUserById(userId: number): Promise<AuthenticatedUser | null> {
+export async function getUserById(
+  userId: number,
+  opts: GetUserOptions = {},
+): Promise<AuthenticatedUser | null> {
   const [row] = await db.select().from(appUser).where(eq(appUser.userId, userId)).limit(1);
   if (!row || !row.isActive) return null;
   return {
@@ -207,5 +282,7 @@ export async function getUserById(userId: number): Promise<AuthenticatedUser | n
     canCreateProjects: row.canCreateProjects,
     canUpdateProjects: row.canUpdateProjects,
     canDeleteProjects: row.canDeleteProjects,
+    canViewProjects: row.canViewProjects,
+    ...(opts.divisionId !== undefined ? { divisionId: opts.divisionId } : {}),
   };
 }

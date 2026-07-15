@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useGetLookupsQuery } from '../app/api/lookupsApi';
 import {
   useCreateUserMutation,
   useListUsersQuery,
@@ -17,14 +18,16 @@ import { formatDate } from '../lib/formatters';
 import type { CreateUserPayload, UpdateUserPayload, UserRole, UserRow } from '../types/api';
 
 const ROLE_TONE: Record<UserRole, string> = {
-  MD: 'bg-[#F0F4F8] text-[#1E3A5F] border-[#93C5FD]',
-  Admin: 'bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]',
+  MD:     'bg-[#F0F4F8] text-[#1E3A5F] border-[#93C5FD]',
+  Admin:  'bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]',
+  PD:     'bg-[#F5F3FF] text-[#6D28D9] border-[#C4B5FD]',
   Viewer: 'bg-[#F9FAFB] text-[#6B7280] border-[#E5E7EB]',
 };
 
 export function UserManagementPage(): JSX.Element {
   const me = useAppSelector(selectCurrentUser);
   const { data, isLoading } = useListUsersQuery();
+  const { data: lookups } = useGetLookupsQuery();
   const [createUser, createState] = useCreateUserMutation();
   const [updateUser, updateState] = useUpdateUserMutation();
 
@@ -33,7 +36,10 @@ export function UserManagementPage(): JSX.Element {
   const busy = createState.isLoading || updateState.isLoading;
 
   const canPromote = me?.role === 'MD';
-  const rolesAvailable: UserRole[] = canPromote ? ['MD', 'Admin', 'Viewer'] : ['Viewer'];
+  // MD sees every role; Admin can create Viewer and PD.
+  const rolesAvailable: UserRole[] = canPromote
+    ? ['MD', 'Admin', 'PD', 'Viewer']
+    : ['PD', 'Viewer'];
 
   const rows = useMemo(() => data?.items ?? [], [data]);
   const usersById = useMemo(() => {
@@ -62,8 +68,8 @@ export function UserManagementPage(): JSX.Element {
             <h1 className="text-lg font-bold text-[#111827]">User Management</h1>
             <p className="text-[12.5px] text-[#6B7280]">
               {me?.role === 'MD'
-                ? 'Full control: create any role, toggle project CRUD flags, deactivate.'
-                : 'Admin scope: create/edit Viewer users only. Grant them project CRUD flags as needed.'}
+                ? 'Full control: create any role, toggle project CRUD flags, assign PD divisions, deactivate.'
+                : 'Admin scope: create/edit Viewer and Project Director accounts. Assign divisions and configure project permissions.'}
             </p>
           </div>
           <Button onClick={() => setAddOpen((o) => !o)} disabled={busy}>
@@ -77,6 +83,7 @@ export function UserManagementPage(): JSX.Element {
             rolesAvailable={rolesAvailable}
             canPromote={canPromote}
             busy={busy}
+            divisionsCatalog={lookups?.divisions ?? []}
             onCancel={() => setAddOpen(false)}
             onSubmit={async (payload) => {
               await createUser(payload as CreateUserPayload).unwrap();
@@ -98,6 +105,8 @@ export function UserManagementPage(): JSX.Element {
                       <th className="px-3 py-2 text-left">Username</th>
                       <th className="px-3 py-2 text-left">Full name</th>
                       <th className="px-3 py-2 text-left">Role</th>
+                      <th className="px-3 py-2 text-left">Divisions (PD)</th>
+                      <th className="px-3 py-2 text-center">View</th>
                       <th className="px-3 py-2 text-center">Create</th>
                       <th className="px-3 py-2 text-center">Update</th>
                       <th className="px-3 py-2 text-center">Delete</th>
@@ -110,10 +119,18 @@ export function UserManagementPage(): JSX.Element {
                   <tbody>
                     {rows.map((u, idx) => {
                       const canEdit =
-                        me?.role === 'MD' || (me?.role === 'Admin' && u.role === 'Viewer');
+                        me?.role === 'MD'
+                        || (me?.role === 'Admin' && (u.role === 'Viewer' || u.role === 'PD'));
                       const isSelf = me?.userId === u.userId;
                       const createdByLabel = u.createdBy
                         ? usersById.get(u.createdBy)?.username ?? `#${u.createdBy}`
+                        : '—';
+                      const divisionsLabel = u.role === 'PD'
+                        ? (u.divisions.length === 0
+                            ? '—'
+                            : u.divisions
+                                .map((id) => lookups?.divisions.find((d) => d.divisionId === id)?.divisionName ?? `#${id}`)
+                                .join(', '))
                         : '—';
                       return (
                         <tr
@@ -142,6 +159,19 @@ export function UserManagementPage(): JSX.Element {
                               {u.role}
                             </span>
                           </td>
+                          <td className="px-3 py-2 text-[11px] text-[#374151]">
+                            {u.role === 'PD' ? (
+                              <span title={divisionsLabel} className="line-clamp-2 max-w-[220px] text-[11px]">
+                                {divisionsLabel}
+                              </span>
+                            ) : (
+                              <span className="text-[#D1D5DB]">—</span>
+                            )}
+                          </td>
+                          <PermCell
+                            enabled={u.role === 'MD' || u.canViewProjects}
+                            bypassed={u.role === 'MD'}
+                          />
                           <PermCell
                             enabled={u.role === 'MD' || u.canCreateProjects}
                             bypassed={u.role === 'MD'}
@@ -201,6 +231,7 @@ export function UserManagementPage(): JSX.Element {
             canPromote={canPromote}
             busy={busy}
             isSelf={me?.userId === editing.userId}
+            divisionsCatalog={lookups?.divisions ?? []}
             onCancel={() => setEditing(null)}
             onSubmit={async (payload) => {
               await updateUser({ userId: editing.userId, body: payload as UpdateUserPayload }).unwrap();
@@ -256,6 +287,8 @@ interface FormPayload {
   canCreateProjects?: boolean;
   canUpdateProjects?: boolean;
   canDeleteProjects?: boolean;
+  canViewProjects?: boolean;
+  divisions?: number[];
 }
 
 interface UserFormProps {
@@ -265,6 +298,7 @@ interface UserFormProps {
   canPromote: boolean;
   busy: boolean;
   isSelf?: boolean;
+  divisionsCatalog: Array<{ divisionId: number; divisionName: string; regionId: number }>;
   onCancel: () => void;
   onSubmit: (payload: FormPayload) => Promise<void>;
 }
@@ -276,6 +310,7 @@ function UserForm({
   canPromote,
   busy,
   isSelf,
+  divisionsCatalog,
   onCancel,
   onSubmit,
 }: UserFormProps): JSX.Element {
@@ -287,6 +322,8 @@ function UserForm({
   const [canCreate, setCanCreate] = useState<boolean>(initial?.canCreateProjects ?? false);
   const [canUpdate, setCanUpdate] = useState<boolean>(initial?.canUpdateProjects ?? false);
   const [canDelete, setCanDelete] = useState<boolean>(initial?.canDeleteProjects ?? false);
+  const [canView,   setCanView]   = useState<boolean>(initial?.canViewProjects ?? true);
+  const [divisions, setDivisions] = useState<number[]>(initial?.divisions ?? []);
   const [error, setError] = useState<string | null>(null);
 
   const canEditRole = mode === 'create' ? true : canPromote && !isSelf;
@@ -305,12 +342,17 @@ function UserForm({
       setError('Password must be at least 8 characters (or leave blank to keep unchanged).');
       return;
     }
+    if (role === 'PD' && divisions.length === 0) {
+      setError('A Project Director must be assigned at least one division.');
+      return;
+    }
 
     const payload: FormPayload = {
       fullName: fullName.trim() || null,
       canCreateProjects: canCreate,
       canUpdateProjects: canUpdate,
       canDeleteProjects: canDelete,
+      canViewProjects:   canView,
     };
     if (mode === 'create') {
       payload.username = username.trim();
@@ -321,6 +363,10 @@ function UserForm({
       if (canEditRole) payload.role = role;
       payload.isActive = isActive;
     }
+    // Only send divisions when relevant to prevent accidentally wiping.
+    if (role === 'PD' || initial?.role === 'PD') {
+      payload.divisions = divisions;
+    }
 
     try {
       await onSubmit(payload);
@@ -330,6 +376,7 @@ function UserForm({
   };
 
   const isMdRole = role === 'MD';
+  const isPdRole = role === 'PD';
 
   return (
     <div className="space-y-3 rounded-lg border border-[#93C5FD] bg-[#F0F7FF] p-4">
@@ -393,20 +440,87 @@ function UserForm({
         ) : null}
       </div>
 
+      {/* ── PD-only: division assignment ─────────────────────────────── */}
+      {isPdRole ? (
+        <div className="rounded border border-[#C4B5FD] bg-[#F5F3FF] p-3">
+          <div className="text-[10.5px] font-bold uppercase tracking-wider text-[#6D28D9]">
+            ▌ Division assignment · Project Director
+          </div>
+          <p className="mt-1 text-[12px] text-[#4B5563]">
+            The PD picks one of these at each login; only projects in the
+            chosen division are visible for that session. Assign at least one.
+          </p>
+          <div className="mt-2 max-h-56 overflow-y-auto rounded border border-[#DDD6FE] bg-white p-2">
+            {divisionsCatalog.length === 0 ? (
+              <p className="text-[12px] text-[#9CA3AF]">No divisions configured yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3">
+                {divisionsCatalog.map((d) => {
+                  const on = divisions.includes(d.divisionId);
+                  return (
+                    <label
+                      key={d.divisionId}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12px] transition-colors',
+                        on
+                          ? 'bg-[#EDE9FE] font-semibold text-[#6D28D9]'
+                          : 'text-[#374151] hover:bg-[#F9FAFB]',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={(e) => {
+                          setDivisions((prev) =>
+                            e.target.checked
+                              ? [...prev, d.divisionId]
+                              : prev.filter((id) => id !== d.divisionId),
+                          );
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      {d.divisionName}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="mt-2 text-[11px] text-[#6B7280]">
+            {divisions.length} assigned
+            {divisions.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setDivisions([])}
+                className="ml-2 text-[#B91C1C] hover:underline"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded border border-[#E5E7EB] bg-white p-3">
         <div className="text-[10.5px] font-bold uppercase tracking-wider text-[#374151]">
-          ▌ Project CRUD permissions
+          ▌ Project permissions
         </div>
         {isMdRole ? (
           <p className="mt-1 text-[12px] text-[#1D4ED8]">
-            💡 MD role bypasses these flags — always allowed to create/update/delete any project.
+            💡 MD role bypasses these flags — always allowed to view/create/update/delete any project.
           </p>
         ) : (
           <p className="mt-1 text-[12px] text-[#6B7280]">
-            Toggle each action independently. Admin role always keeps all three on by default.
+            Toggle each action independently. Admin role always keeps all four on by default.
           </p>
         )}
-        <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+        <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <PermToggle
+            label="Can view projects"
+            checked={canView || isMdRole}
+            disabled={isMdRole}
+            onChange={setCanView}
+          />
           <PermToggle
             label="Can create projects"
             checked={canCreate || isMdRole}

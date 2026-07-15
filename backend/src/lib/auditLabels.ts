@@ -182,6 +182,8 @@ export const APP_USER_LABELS: Record<string, string> = {
   canCreateProjects: 'Can create projects',
   canUpdateProjects: 'Can update projects',
   canDeleteProjects: 'Can delete projects',
+  canViewProjects: 'Can view projects',
+  divisions: 'Assigned divisions',
   createdBy: 'Created by',
   userId: 'User ID',
   table: 'Table',

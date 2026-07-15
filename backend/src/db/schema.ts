@@ -362,10 +362,29 @@ export const appUser = pgTable('app_user', {
   canCreateProjects: boolean('can_create_projects').notNull().default(false),
   canUpdateProjects: boolean('can_update_projects').notNull().default(false),
   canDeleteProjects: boolean('can_delete_projects').notNull().default(false),
+  canViewProjects:   boolean('can_view_projects').notNull().default(true),
   createdBy: integer('created_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   lastLogin: timestamp('last_login', { withTimezone: true }),
 });
+
+/** PD ↔ Division assignment (Phase C1 §3). */
+export const userDivision = pgTable(
+  'user_division',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.userId, { onDelete: 'cascade' }),
+    divisionId: integer('division_id')
+      .notNull()
+      .references(() => division.divisionId, { onDelete: 'cascade' }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.divisionId] }),
+    userIdx: index('idx_user_division_user').on(t.userId),
+    divisionIdx: index('idx_user_division_division').on(t.divisionId),
+  }),
+);
 
 export const auditLog = pgTable(
   'audit_log',
@@ -413,6 +432,9 @@ export const refreshToken = pgTable(
     replacedBy: text('replaced_by'),
     userAgent: text('user_agent'),
     ipAddress: text('ip_address'),
+    /** PD's chosen division for this session; NULL for MD/Admin/Viewer. */
+    selectedDivisionId: integer('selected_division_id')
+      .references(() => division.divisionId),
   },
   (t) => ({
     userIdx: index('idx_refresh_token_user').on(t.userId),
@@ -458,6 +480,9 @@ export type MomActionPointInsert = typeof momActionPoint.$inferInsert;
 
 export type AppUser = typeof appUser.$inferSelect;
 export type AppUserInsert = typeof appUser.$inferInsert;
+
+export type UserDivision = typeof userDivision.$inferSelect;
+export type UserDivisionInsert = typeof userDivision.$inferInsert;
 
 export type AuditLog = typeof auditLog.$inferSelect;
 export type AuditLogInsert = typeof auditLog.$inferInsert;

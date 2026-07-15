@@ -11,6 +11,9 @@ declare global {
         canCreateProjects: boolean;
         canUpdateProjects: boolean;
         canDeleteProjects: boolean;
+        canViewProjects: boolean;
+        /** PD's selected division for the session; undefined for MD/Admin/Viewer. */
+        divisionId?: number;
       };
     }
   }

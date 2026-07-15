@@ -23,6 +23,11 @@ export interface AccessTokenPayload {
   sub: string;
   role: UserRole;
   name: string;
+  /**
+   * PD's selected division for the session. Present only when `role === 'PD'`.
+   * Server-side division filtering will use this on every request (Phase C2).
+   */
+  divisionId?: number;
 }
 
 export interface RefreshTokenPayload {

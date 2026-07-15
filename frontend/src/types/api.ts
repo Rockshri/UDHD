@@ -5,7 +5,7 @@
  * response shape changes, update the matching type here.
  */
 
-export type UserRole = 'MD' | 'Admin' | 'Viewer';
+export type UserRole = 'MD' | 'Admin' | 'PD' | 'Viewer';
 
 export type ProjectStatus =
   | 'Not Started'
@@ -79,11 +79,27 @@ export interface UserPublic {
   canCreateProjects: boolean;
   canUpdateProjects: boolean;
   canDeleteProjects: boolean;
+  canViewProjects: boolean;
+  /** PD's selected division for this session; absent for other roles. */
+  divisionId?: number;
 }
 
 export interface LoginRequest {
   username: string;
   password: string;
+  /** Step 2 of the PD login handshake. */
+  divisionId?: number;
+}
+
+/**
+ * The /auth/login and /auth/refresh endpoints return one of two shapes:
+ *  - success: full AuthResponse (user + tokens)
+ *  - needsDivision: PD credentials verified but division not yet picked.
+ * The client shows a division picker and re-POSTs with divisionId.
+ */
+export interface AuthNeedsDivision {
+  needsDivision: true;
+  divisions: Array<{ divisionId: number; divisionName: string }>;
 }
 
 export interface AuthResponse {
@@ -91,6 +107,8 @@ export interface AuthResponse {
   accessToken: string;
   accessTokenExpiresAt: string;
 }
+
+export type LoginResponse = AuthResponse | AuthNeedsDivision;
 
 export interface MeResponse {
   user: UserPublic;
@@ -663,6 +681,9 @@ export interface UserRow {
   canCreateProjects: boolean;
   canUpdateProjects: boolean;
   canDeleteProjects: boolean;
+  canViewProjects: boolean;
+  /** Assigned division IDs; PDs must have ≥ 1, empty for other roles. */
+  divisions: number[];
   createdBy: number | null;
   createdAt: string | null;
   lastLogin: string | null;
@@ -676,6 +697,8 @@ export interface CreateUserPayload {
   canCreateProjects?: boolean;
   canUpdateProjects?: boolean;
   canDeleteProjects?: boolean;
+  canViewProjects?: boolean;
+  divisions?: number[];
 }
 
 export interface UpdateUserPayload {
@@ -686,6 +709,8 @@ export interface UpdateUserPayload {
   canCreateProjects?: boolean;
   canUpdateProjects?: boolean;
   canDeleteProjects?: boolean;
+  canViewProjects?: boolean;
+  divisions?: number[];
 }
 
 export interface AuditChange {

@@ -112,7 +112,7 @@ export const momStatuses = [
 ] as const;
 export type MomStatus = (typeof momStatuses)[number];
 
-export const userRoles = ['MD', 'Admin', 'Viewer'] as const;
+export const userRoles = ['MD', 'Admin', 'PD', 'Viewer'] as const;
 export type UserRole = (typeof userRoles)[number];
 
 export const auditActions = ['Created', 'Updated', 'Deleted'] as const;
