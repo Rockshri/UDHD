@@ -119,7 +119,7 @@ export function CosEotSection({ projectId, items }: Props): JSX.Element {
       <Card>
         <CardContent className="pt-4">
           <FormSectionHeader
-            num="04"
+            num="03"
             title="Change of Scope (CoS) & Extension of Time (EoT)"
             sub="Save the project first — CoS/EoT rows attach to an existing project."
           />
@@ -166,7 +166,7 @@ export function CosEotSection({ projectId, items }: Props): JSX.Element {
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="04"
+          num="03"
           title="Change of Scope (CoS) & Extension of Time (EoT)"
           sub="Each row is a separate CoS event. Revised End Date on the latest row feeds Section 02."
           right={

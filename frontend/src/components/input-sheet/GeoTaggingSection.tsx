@@ -62,7 +62,7 @@ export function GeoTaggingSection({ projectId, draft, setField, photos }: Props)
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="06"
+          num="04"
           title="Geo-Tagging"
           sub="Reference/overview URL for the dashboard + linked site photos"
         />

@@ -75,7 +75,7 @@ export function OmDetailsSection({ draft, setField }: Props): JSX.Element {
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="08"
+          num="06"
           title="O&M (Operations & Maintenance)"
           sub="Applicable only to Completed projects — pre-fill anyway; alerts fire once status is Completed"
         />

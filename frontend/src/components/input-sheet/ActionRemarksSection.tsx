@@ -81,7 +81,7 @@ export function ActionRemarksSection({
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="07"
+          num="05"
           title="Action & Remarks"
           sub="Outstanding gaps, priority, and management action items"
         />

@@ -7,9 +7,14 @@ import type { ProjectDraft } from '../../hooks/useProjectDraft';
 interface Props {
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
+  /**
+   * Fixed Input section — locked to MD/Admin. PD/Viewer see the fields for
+   * context but can't mutate any of them.
+   */
+  readOnly?: boolean;
 }
 
-export function ContractSecuritySection({ draft, setField }: Props): JSX.Element {
+export function ContractSecuritySection({ draft, setField, readOnly = false }: Props): JSX.Element {
   const contractValue = draft.contractValueCr ?? 0;
   const paidToDate = draft.totalPaymentsCr ?? 0;
   const balance = contractValue - paidToDate;
@@ -18,10 +23,25 @@ export function ContractSecuritySection({ draft, setField }: Props): JSX.Element
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="05"
+          num="02"
           title="Contract & Financial Security"
           sub="Agreement, PBG, EMD, payments & retention (all in ₹ Cr)"
         />
+        {readOnly ? (
+          <div
+            role="note"
+            className="mb-3 flex items-start gap-2 rounded border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2 text-[12px] text-[#92400E]"
+          >
+            <span aria-hidden className="text-[13px]">🔒</span>
+            <div>
+              <p className="font-semibold">Read-only — Fixed Input section</p>
+              <p className="mt-0.5 text-[11.5px] text-[#78350F]/80">
+                Only MD and Admin roles can change Basic Info or Contract &amp; Security
+                fields. Ask an Admin if a change is needed here.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <FieldGroup label="Agreement Details">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -29,42 +49,49 @@ export function ContractSecuritySection({ draft, setField }: Props): JSX.Element
               label="Agreement Number"
               value={draft.agreementNumber}
               onChange={(v) => setField('agreementNumber', v || null)}
+              disabled={readOnly}
             />
             <FormField
               label="Agreement Date"
               type="date"
               value={draft.agreementDate}
               onChange={(v) => setField('agreementDate', v || null)}
+              disabled={readOnly}
             />
             <FormField
               label="Appointed Date"
               type="date"
               value={draft.appointedDate}
               onChange={(v) => setField('appointedDate', v || null)}
+              disabled={readOnly}
             />
             <NumberField
               label="Contract Value"
               suffix="₹ Cr"
               value={draft.contractValueCr}
               onChange={(v) => setField('contractValueCr', v)}
+              disabled={readOnly}
             />
             <NumberField
               label="Mobilization Advance Issued"
               suffix="₹ Cr"
               value={draft.mobAdvanceIssuedCr}
               onChange={(v) => setField('mobAdvanceIssuedCr', v)}
+              disabled={readOnly}
             />
             <NumberField
               label="Mob. Advance Recovered"
               suffix="₹ Cr"
               value={draft.mobAdvanceRecoveredCr}
               onChange={(v) => setField('mobAdvanceRecoveredCr', v)}
+              disabled={readOnly}
             />
             <NumberField
               label="Advance Outstanding"
               suffix="₹ Cr"
               value={draft.advanceOutstandingCr}
               onChange={(v) => setField('advanceOutstandingCr', v)}
+              disabled={readOnly}
             />
           </div>
         </FieldGroup>
@@ -75,24 +102,28 @@ export function ContractSecuritySection({ draft, setField }: Props): JSX.Element
               label="PBG Number"
               value={draft.pbgNumber}
               onChange={(v) => setField('pbgNumber', v || null)}
+              disabled={readOnly}
             />
             <NumberField
               label="PBG Amount"
               suffix="₹ Cr"
               value={draft.pbgAmountCr}
               onChange={(v) => setField('pbgAmountCr', v)}
+              disabled={readOnly}
             />
             <FormField
               label="PBG Expiry Date"
               type="date"
               value={draft.pbgExpiryDate}
               onChange={(v) => setField('pbgExpiryDate', v || null)}
+              disabled={readOnly}
             />
             <FormField
               label="PBG Issuing Bank"
               value={draft.pbgIssuingBank}
               onChange={(v) => setField('pbgIssuingBank', v || null)}
               className="md:col-span-3"
+              disabled={readOnly}
             />
           </div>
         </FieldGroup>
@@ -104,17 +135,20 @@ export function ContractSecuritySection({ draft, setField }: Props): JSX.Element
               suffix="₹ Cr"
               value={draft.emdAmountCr}
               onChange={(v) => setField('emdAmountCr', v)}
+              disabled={readOnly}
             />
             <FormField
               label="EMD Reference Number"
               value={draft.emdRefNumber}
               onChange={(v) => setField('emdRefNumber', v || null)}
+              disabled={readOnly}
             />
             <FormField
               label="EMD Date"
               type="date"
               value={draft.emdDate}
               onChange={(v) => setField('emdDate', v || null)}
+              disabled={readOnly}
             />
           </div>
         </FieldGroup>
@@ -126,23 +160,27 @@ export function ContractSecuritySection({ draft, setField }: Props): JSX.Element
               suffix="₹ Cr"
               value={draft.totalPaymentsCr}
               onChange={(v) => setField('totalPaymentsCr', v)}
+              disabled={readOnly}
             />
             <FormField
               label="Last Payment Date"
               type="date"
               value={draft.lastPaymentDate}
               onChange={(v) => setField('lastPaymentDate', v || null)}
+              disabled={readOnly}
             />
             <FormField
               label="Last RA Bill No."
               value={draft.lastRaBillNo}
               onChange={(v) => setField('lastRaBillNo', v || null)}
+              disabled={readOnly}
             />
             <NumberField
               label="Retention Money Held"
               suffix="₹ Cr"
               value={draft.retentionMoneyHeldCr}
               onChange={(v) => setField('retentionMoneyHeldCr', v)}
+              disabled={readOnly}
             />
           </div>
         </FieldGroup>

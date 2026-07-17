@@ -17,7 +17,6 @@ function buildQuery(f: ReturnType<typeof useProjectFilters>['filters'], cursor?:
   if (f.projectStage) q.projectStage = f.projectStage;
   if (f.contractType) q.contractType = f.contractType;
   if (f.sectorId) q.sectorId = Number(f.sectorId);
-  if (f.districtId) q.districtId = Number(f.districtId);
   if (f.divisionId) q.divisionId = Number(f.divisionId);
   if (f.regionId) q.regionId = Number(f.regionId);
   if (f.schemeId) q.schemeId = Number(f.schemeId);

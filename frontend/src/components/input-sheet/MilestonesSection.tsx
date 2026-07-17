@@ -74,7 +74,7 @@ export function MilestonesSection({ projectId }: Props): JSX.Element {
       <Card>
         <CardContent className="pt-4">
           <FormSectionHeader
-            num="M"
+            num="07"
             title="Milestones & Monthly Progress"
             sub="Milestone-weighted effective % — available after saving the project."
           />
@@ -174,7 +174,7 @@ export function MilestonesSection({ projectId }: Props): JSX.Element {
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="M"
+          num="07"
           title="Milestones & Monthly Progress"
           sub="Weights must sum to 100 (Postgres trigger enforces this atomically at commit)"
           right={

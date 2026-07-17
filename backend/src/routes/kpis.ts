@@ -1,159 +1,167 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { sessionDivisionId } from '../lib/actor.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as kpi from '../lib/kpi.js';
 
+/**
+ * Phase C2 — every KPI endpoint threads the PD's session divisionId into
+ * the query layer. For MD/Admin/Viewer this is null → portfolio-wide
+ * (unchanged behaviour). For PDs the query re-aggregates over their
+ * division only. Enforced at the routing edge so a rogue caller cannot
+ * bypass filtering by hitting the endpoint directly.
+ */
 export const kpisRouter = Router();
 
 kpisRouter.use(requireAuth);
 
-kpisRouter.get('/overview', async (_req, res, next) => {
+kpisRouter.get('/overview', async (req, res, next) => {
   try {
-    res.json(await kpi.getOverviewKpis());
+    res.json(await kpi.getOverviewKpis(sessionDivisionId(req)));
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/schedule-vs-actual', async (_req, res, next) => {
+kpisRouter.get('/schedule-vs-actual', async (req, res, next) => {
   try {
-    res.json(await kpi.getScheduleVsActual());
+    res.json(await kpi.getScheduleVsActual(sessionDivisionId(req)));
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/stage-buckets', async (_req, res, next) => {
+kpisRouter.get('/stage-buckets', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getStageBuckets() });
+    res.json({ items: await kpi.getStageBuckets(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/work-type-counts', async (_req, res, next) => {
+kpisRouter.get('/work-type-counts', async (req, res, next) => {
   try {
-    res.json(await kpi.getWorkTypeCounts());
+    res.json(await kpi.getWorkTypeCounts(sessionDivisionId(req)));
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/financial-securities', async (_req, res, next) => {
+kpisRouter.get('/financial-securities', async (req, res, next) => {
   try {
-    res.json(await kpi.getFinancialSecurities());
+    res.json(await kpi.getFinancialSecurities(sessionDivisionId(req)));
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/pbg-expiry-alerts', async (_req, res, next) => {
+kpisRouter.get('/pbg-expiry-alerts', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getPbgExpiryAlerts() });
+    res.json({ items: await kpi.getPbgExpiryAlerts(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/om-status', async (_req, res, next) => {
+kpisRouter.get('/om-status', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getOmStatus() });
+    res.json({ items: await kpi.getOmStatus(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/om-expiry-alerts', async (_req, res, next) => {
+kpisRouter.get('/om-expiry-alerts', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getOmExpiryAlerts() });
+    res.json({ items: await kpi.getOmExpiryAlerts(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/scheme-chart', async (_req, res, next) => {
+kpisRouter.get('/scheme-chart', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getSchemeChart() });
+    res.json({ items: await kpi.getSchemeChart(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/status-donut', async (_req, res, next) => {
+kpisRouter.get('/status-donut', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getStatusDonut() });
+    res.json({ items: await kpi.getStatusDonut(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/scheme-summary', async (_req, res, next) => {
+kpisRouter.get('/scheme-summary', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getSchemeSummary() });
+    res.json({ items: await kpi.getSchemeSummary(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/scheme-kpi-summary', async (_req, res, next) => {
+kpisRouter.get('/scheme-kpi-summary', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getSchemeKpiSummary() });
+    res.json({ items: await kpi.getSchemeKpiSummary(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/sector-summary', async (_req, res, next) => {
+kpisRouter.get('/sector-summary', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getSectorSummary() });
+    res.json({ items: await kpi.getSectorSummary(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/district-summary', async (_req, res, next) => {
+kpisRouter.get('/district-summary', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getDistrictSummary() });
+    res.json({ items: await kpi.getDistrictSummary(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/division-summary', async (_req, res, next) => {
+kpisRouter.get('/division-summary', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getDivisionSummary() });
+    res.json({ items: await kpi.getDivisionSummary(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/region-summary', async (_req, res, next) => {
+kpisRouter.get('/region-summary', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getRegionSummary() });
+    res.json({ items: await kpi.getRegionSummary(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/delay-status', async (_req, res, next) => {
+kpisRouter.get('/delay-status', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getDelayStatus() });
+    res.json({ items: await kpi.getDelayStatus(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/outstanding-gaps', async (_req, res, next) => {
+kpisRouter.get('/outstanding-gaps', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getOutstandingGaps() });
+    res.json({ items: await kpi.getOutstandingGaps(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
 });
 
-kpisRouter.get('/management-action-summary', async (_req, res, next) => {
+kpisRouter.get('/management-action-summary', async (req, res, next) => {
   try {
-    res.json({ items: await kpi.getManagementActionSummary() });
+    res.json({ items: await kpi.getManagementActionSummary(sessionDivisionId(req)) });
   } catch (err) {
     next(err);
   }
@@ -167,7 +175,7 @@ const cosEotQuery = z.object({
 kpisRouter.get('/cos-eot-records', async (req, res, next) => {
   try {
     const { limit, offset } = cosEotQuery.parse(req.query);
-    const items = await kpi.listCosEotRecords(limit + 1, offset);
+    const items = await kpi.listCosEotRecords(limit + 1, offset, sessionDivisionId(req));
     const hasMore = items.length > limit;
     res.json({
       items: hasMore ? items.slice(0, limit) : items,

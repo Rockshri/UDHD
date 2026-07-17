@@ -9,6 +9,7 @@ export interface MultiSelectFieldProps {
   placeholder?: string;
   className?: string;
   hint?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -23,6 +24,7 @@ export function MultiSelectField({
   placeholder = 'Add…',
   className,
   hint,
+  disabled = false,
 }: MultiSelectFieldProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -40,10 +42,12 @@ export function MultiSelectField({
   const available = options.filter((o) => !selected.has(o.value));
 
   const add = (v: number): void => {
+    if (disabled) return;
     if (!selected.has(v)) onChange([...value, v]);
     setOpen(false);
   };
   const remove = (v: number): void => {
+    if (disabled) return;
     onChange(value.filter((x) => x !== v));
   };
 
@@ -53,37 +57,51 @@ export function MultiSelectField({
         {label}
       </span>
       <div ref={ref} className="relative">
-        <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded border border-[#D1D5DB] bg-white p-1.5">
+        <div
+          className={cn(
+            'flex min-h-9 flex-wrap items-center gap-1.5 rounded border border-[#D1D5DB] p-1.5',
+            disabled ? 'cursor-not-allowed bg-[#F9FAFB]' : 'bg-white',
+          )}
+        >
           {value.map((v) => {
             const opt = options.find((o) => o.value === v);
             const chipLabel = opt?.label ?? `#${v}`;
             return (
               <span
                 key={v}
-                className="inline-flex items-center gap-1 rounded-full bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]"
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                  disabled
+                    ? 'bg-[#F3F4F6] text-[#6B7280]'
+                    : 'bg-[#EFF6FF] text-[#1D4ED8]',
+                )}
               >
                 {chipLabel}
-                <button
-                  type="button"
-                  onClick={() => remove(v)}
-                  className="text-[#1D4ED8] hover:text-[#B91C1C]"
-                  aria-label={`Remove ${chipLabel}`}
-                >
-                  ×
-                </button>
+                {disabled ? null : (
+                  <button
+                    type="button"
+                    onClick={() => remove(v)}
+                    className="text-[#1D4ED8] hover:text-[#B91C1C]"
+                    aria-label={`Remove ${chipLabel}`}
+                  >
+                    ×
+                  </button>
+                )}
               </span>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="ml-auto rounded px-2 py-0.5 text-[11px] font-semibold text-[#1E3A5F] hover:bg-[#F3F4F6]"
-            disabled={available.length === 0}
-          >
-            {available.length === 0 ? 'All added' : placeholder}
-          </button>
+          {disabled ? null : (
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              className="ml-auto rounded px-2 py-0.5 text-[11px] font-semibold text-[#1E3A5F] hover:bg-[#F3F4F6]"
+              disabled={available.length === 0}
+            >
+              {available.length === 0 ? 'All added' : placeholder}
+            </button>
+          )}
         </div>
-        {open && available.length > 0 ? (
+        {open && !disabled && available.length > 0 ? (
           <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded border border-[#E5E7EB] bg-white shadow-lg">
             {available.map((o) => (
               <button

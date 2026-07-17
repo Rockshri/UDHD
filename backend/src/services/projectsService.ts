@@ -12,6 +12,31 @@ import { decodeCursor, encodeCursor } from '../lib/pagination.js';
 import type { CreateProjectInput, UpdateProjectInput } from '../lib/projectFields.js';
 import { HttpError } from '../middleware/errorHandler.js';
 
+/**
+ * Fixed Input fields (Input Sheet §1 / §5) — Basic Info + Contract & Security.
+ * Only MD and Admin are allowed to change these; PD/Viewer patches are
+ * silently stripped so they can still update Variable Input fields
+ * (progress, remarks, geo photos, milestones, etc.) on the same request.
+ *
+ * The `schemes` many-to-many is not part of the `project` row's plain
+ * columns but IS part of Basic Info from the user's POV, so it's guarded
+ * separately in the update flow below.
+ */
+const FIXED_INPUT_KEYS = new Set<string>([
+  // Basic Info
+  'projectName', 'sectorId', 'city', 'districtId', 'divisionId',
+  'contractor', 'pd', 'mainWork', 'physicalWorkProgressNote',
+  'contractType', 'sponsoringDept', 'implementingAgency', 'sanctionDate',
+  'projectBrief',
+  // Contract & Security
+  'agreementNumber', 'agreementDate', 'appointedDate',
+  'contractValueCr', 'mobAdvanceIssuedCr', 'mobAdvanceRecoveredCr',
+  'advanceOutstandingCr', 'retentionMoneyHeldCr',
+  'pbgNumber', 'pbgAmountCr', 'pbgExpiryDate', 'pbgIssuingBank',
+  'emdAmountCr', 'emdRefNumber', 'emdDate',
+  'totalPaymentsCr', 'lastPaymentDate', 'lastRaBillNo',
+]);
+
 const NUMERIC_KEYS = [
   'sanctionedCostCr',
   'aaAmountCr',
@@ -75,6 +100,11 @@ export interface ProjectListItem extends Numified<Project> {
 
 export async function listProjects(
   q: ListProjectsQuery,
+  /**
+   * PD's session division from JWT. When set, forces division_id filter
+   * regardless of what's in `q` — PDs can't broaden scope via query params.
+   */
+  pdDivisionId: number | null = null,
 ): Promise<{ items: ProjectListItem[]; nextCursor: string | null }> {
   const filters = [] as ReturnType<typeof eq>[];
   if (q.status) filters.push(eq(project.status, q.status));
@@ -82,7 +112,13 @@ export async function listProjects(
   if (q.projectStage) filters.push(eq(project.projectStageV2, q.projectStage));
   if (q.contractType) filters.push(eq(project.contractType, q.contractType));
   if (q.districtId) filters.push(eq(project.districtId, q.districtId));
-  if (q.divisionId) filters.push(eq(project.divisionId, q.divisionId));
+  // Phase C2 — PDs are locked to their session's division; the JWT claim
+  // supersedes any divisionId in the query string.
+  if (pdDivisionId !== null) {
+    filters.push(eq(project.divisionId, pdDivisionId));
+  } else if (q.divisionId) {
+    filters.push(eq(project.divisionId, q.divisionId));
+  }
   if (q.sectorId) filters.push(eq(project.sectorId, q.sectorId));
 
   if (q.cursor) {
@@ -97,7 +133,8 @@ export async function listProjects(
 
   // Region filter: pass through to project.divisionId via a subquery join,
   // since the project table has no region_id column of its own.
-  const regionClause = q.regionId
+  // PDs never see a region filter — they're already pinned to a division.
+  const regionClause = q.regionId && pdDivisionId === null
     ? sql`${project.divisionId} IN (SELECT ${division.divisionId} FROM ${division}
                                     WHERE ${division.regionId} = ${q.regionId})`
     : undefined;
@@ -175,7 +212,10 @@ export interface ProjectDetail extends Numified<Project> {
   schemes: number[];
 }
 
-export async function getProject(projectId: string): Promise<ProjectDetail> {
+export async function getProject(
+  projectId: string,
+  pdDivisionId: number | null = null,
+): Promise<ProjectDetail> {
   const [row] = await db
     .select({
       p: project,
@@ -188,6 +228,12 @@ export async function getProject(projectId: string): Promise<ProjectDetail> {
     .limit(1);
 
   if (!row) {
+    throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
+  }
+  // Phase C2 — if the requester is a PD, refuse access to projects outside
+  // their session's division. Return 404 (not 403) so we don't reveal that
+  // the project exists in some other division.
+  if (pdDivisionId !== null && row.p.divisionId !== pdDivisionId) {
     throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
   }
 
@@ -246,9 +292,30 @@ function stripSchemesFromPatch(input: CreateProjectInput | UpdateProjectInput): 
   return { schemes, fields: rest };
 }
 
-export async function createProject(input: CreateProjectInput, actor: AuditActor): Promise<ProjectDetail> {
+export async function createProject(
+  input: CreateProjectInput,
+  actor: AuditActor,
+  pdDivisionId: number | null = null,
+): Promise<ProjectDetail> {
+  // Creating a project necessarily sets Basic Info + Contract & Security
+  // fields (Fixed Inputs). Per the Input Sheet split, only MD/Admin may
+  // change those, so a non-MD/Admin create is blocked outright even if
+  // their canCreateProjects flag happens to be on.
+  if (actor.role !== 'MD' && actor.role !== 'Admin') {
+    throw new HttpError(
+      403,
+      'FIXED_INPUT_ROLE_REQUIRED',
+      'Only MD or Admin can create new projects (Basic Info + Contract & Security are Fixed Inputs).',
+    );
+  }
+
   const projectId = randomUUID();
   const { schemes, fields } = stripSchemesFromPatch(input);
+  // Phase C2 — PDs create projects only in their own division; any client-
+  // supplied divisionId is overwritten. Prevents payload manipulation.
+  if (pdDivisionId !== null) {
+    (fields as Record<string, unknown>).divisionId = pdDivisionId;
+  }
 
   await db.transaction(async (tx) => {
     const [inserted] = await tx
@@ -282,9 +349,29 @@ export async function updateProject(
   projectId: string,
   input: UpdateProjectInput,
   actor: AuditActor,
+  pdDivisionId: number | null = null,
 ): Promise<ProjectDetail> {
-  const { schemes, fields } = stripSchemesFromPatch(input);
+  const { schemes: rawSchemes, fields } = stripSchemesFromPatch(input);
   const patch = fields as Partial<Project>;
+  // Phase C2 — PDs cannot reassign a project to another division. Silently
+  // drop any divisionId in the patch; project-access middleware has already
+  // verified they own this project.
+  if (pdDivisionId !== null && 'divisionId' in patch) {
+    delete (patch as Record<string, unknown>).divisionId;
+  }
+  // Fixed Input restriction — only MD/Admin may mutate Basic Info + Contract
+  // & Security columns. Anything else in the patch (Variable Input fields
+  // like progress %, remarks, geo URLs, etc.) still goes through unchanged.
+  // Schemes M2M counts as Basic Info, so strip it too for non-MD/Admin.
+  let schemes = rawSchemes;
+  if (actor.role !== 'MD' && actor.role !== 'Admin') {
+    for (const key of Object.keys(patch)) {
+      if (FIXED_INPUT_KEYS.has(key)) {
+        delete (patch as Record<string, unknown>)[key];
+      }
+    }
+    schemes = undefined;
+  }
   const patchKeys = Object.keys(patch);
 
   const post = await db.transaction(async (tx) => {
@@ -383,3 +470,27 @@ export async function deleteProject(projectId: string, actor: AuditActor): Promi
 }
 
 export const projectIdParamSchema = z.object({ projectId: z.string().uuid() });
+
+/**
+ * Cheap access check — reads only the division_id column. Used by the
+ * pdProjectGuard middleware on every `/:projectId/*` route so PDs can't
+ * touch nested resources (CoS/EoT, milestones, mgmt actions, geo photos,
+ * physical/milestone history) belonging to another division.
+ * Returns 404 to avoid leaking existence.
+ */
+export async function assertPdCanAccessProject(
+  projectId: string,
+  pdDivisionId: number,
+): Promise<void> {
+  const [row] = await db
+    .select({ divisionId: project.divisionId })
+    .from(project)
+    .where(eq(project.projectId, projectId))
+    .limit(1);
+  if (!row) {
+    throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
+  }
+  if (row.divisionId !== pdDivisionId) {
+    throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
+  }
+}

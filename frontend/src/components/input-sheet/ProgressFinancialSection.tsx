@@ -33,7 +33,7 @@ export function ProgressFinancialSection({ draft, setField, cosItems }: Props): 
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="03"
+          num="02"
           title="Progress & Financial"
           sub="Sanctioned Cost auto-fills from Revised AA (or AA). CoS totals derive from Section 04."
         />

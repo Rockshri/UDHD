@@ -2,16 +2,26 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useLogoutMutation } from '../../app/api/authApi';
+import { useGetLookupsQuery } from '../../app/api/lookupsApi';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import {
   openMdBriefing,
   selectCurrentUser,
 } from '../../features/auth/authSlice';
 import { cn } from '../../lib/utils';
+import type { UserRole } from '../../types/api';
 import { RoleGate } from '../auth/RoleGate';
 import { BuidcoLogo } from './BuidcoLogo';
 import { KpiGuideDrawer } from './KpiGuideDrawer';
 import { NavClock } from './NavClock';
+
+/** Full-form role labels for the header user pill (PD_role.md §2/§3). */
+const ROLE_DISPLAY: Record<UserRole, string> = {
+  MD: 'Managing Director',
+  Admin: 'Admin',
+  PD: 'Project Director',
+  Viewer: 'Viewer',
+};
 
 /**
  * The 10 primary-nav items moved into the left sidebar per Read.md §1.
@@ -48,6 +58,9 @@ interface TopNavProps {
 }
 
 export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
+  // Lookups powers the division-name label for PD pills. Query is cheap
+  // (cached 1h in RTK Query) and skipped for non-authenticated sessions.
+  const { data: lookups } = useGetLookupsQuery();
   const user = useAppSelector(selectCurrentUser);
   const dispatch = useAppDispatch();
   const [logout, { isLoading: loggingOut }] = useLogoutMutation();
@@ -136,22 +149,17 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
 
           <NavClock />
 
-          <div className="flex flex-col overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
-            <div className="flex items-center justify-center gap-1.5 border-b border-[#E5E7EB] bg-[#F9FAFB] px-3 py-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#111827]">
-                {user?.role ?? '—'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={onSignOut}
-              disabled={loggingOut}
-              className="cursor-pointer bg-white px-3 py-0.5 text-[10.5px] font-medium text-[#6B7280] transition-colors hover:bg-[#FEF2F2] hover:text-[#B91C1C] disabled:opacity-60"
-            >
-              {loggingOut ? 'Signing out…' : 'Sign out'}
-            </button>
-          </div>
+          <UserPill
+            user={user}
+            divisionName={
+              user?.role === 'PD' && user.divisionId !== undefined
+                ? lookups?.divisions.find((d) => d.divisionId === user.divisionId)?.divisionName
+                    ?? `#${user.divisionId}`
+                : null
+            }
+            loggingOut={loggingOut}
+            onSignOut={onSignOut}
+          />
         </div>
       </div>
 
@@ -159,5 +167,64 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
 
       <KpiGuideDrawer open={kpiOpen} onClose={() => setKpiOpen(false)} />
     </header>
+  );
+}
+
+/**
+ * Header user pill (PD_role.md §2/§3).
+ *
+ *   All roles → Username · Role
+ *   PDs      → Username · Role · Division (matches the JWT's session division;
+ *              updates automatically if the divisionId in Redux changes)
+ *
+ * Kept as a small local component so TopNav's JSX stays legible.
+ */
+function UserPill({
+  user, divisionName, loggingOut, onSignOut,
+}: {
+  user: ReturnType<typeof selectCurrentUser> extends infer U ? U : never;
+  divisionName: string | null;
+  loggingOut: boolean;
+  onSignOut: () => Promise<void>;
+}): JSX.Element {
+  const displayName = user?.fullName || user?.username || '—';
+  const roleLabel = user ? (ROLE_DISPLAY[user.role] ?? user.role) : '—';
+  // Full descriptor for the tooltip so truncation doesn't hide data.
+  const fullDescriptor = [displayName, roleLabel, divisionName]
+    .filter(Boolean)
+    .join(' · ');
+  // Compact single-row pill: dot · Name · role/division · sign-out.
+  // Fits within the 50px header without vertical overflow.
+  return (
+    <div
+      className="flex h-8 items-center gap-2 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white pl-2.5 pr-1"
+      title={fullDescriptor}
+    >
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22C55E]" aria-hidden />
+      <div className="flex min-w-0 items-baseline gap-1.5">
+        <span className="max-w-[110px] truncate text-[11.5px] font-bold text-[#111827]">
+          {displayName}
+        </span>
+        <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#6B7280]">
+          {roleLabel}
+        </span>
+        {divisionName ? (
+          <>
+            <span aria-hidden className="text-[9.5px] leading-none text-[#D1D5DB]">·</span>
+            <span className="max-w-[90px] truncate text-[9.5px] font-semibold uppercase tracking-wider text-[#6D28D9]">
+              {divisionName}
+            </span>
+          </>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={onSignOut}
+        disabled={loggingOut}
+        className="ml-1 shrink-0 cursor-pointer rounded border border-transparent bg-white px-2 py-1 text-[10.5px] font-medium text-[#6B7280] transition-colors hover:border-[#FCA5A5] hover:bg-[#FEF2F2] hover:text-[#B91C1C] disabled:opacity-60"
+      >
+        {loggingOut ? 'Signing out…' : 'Sign out'}
+      </button>
+    </div>
   );
 }

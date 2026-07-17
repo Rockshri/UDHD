@@ -14,7 +14,6 @@ export interface ProjectFilters {
   projectStage: string;
   contractType: string;
   priority: string;
-  districtId: string;
   divisionId: string;
   regionId: string;
   sectorId: string;
@@ -27,7 +26,6 @@ const EMPTY: ProjectFilters = {
   projectStage: '',
   contractType: '',
   priority: '',
-  districtId: '',
   divisionId: '',
   regionId: '',
   sectorId: '',

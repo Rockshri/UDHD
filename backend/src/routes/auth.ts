@@ -16,7 +16,24 @@ const loginSchema = z.object({
 });
 
 function ipKey(req: Request): string {
-  return req.ip ?? 'unknown';
+  return `ip:${req.ip ?? 'unknown'}`;
+}
+
+/**
+ * Login rate-limit key: the submitted username (case-folded), NOT the IP.
+ * Per-user keying means each account has its own 20/15min budget — one
+ * PD's typo-prone session can't lock out MDs sharing the same office
+ * network, and successful sign-ins by others don't spend their budget.
+ * Falls back to IP if the body is missing/malformed so a flood of empty
+ * POSTs still gets throttled.
+ */
+function loginKey(req: Request): string {
+  const body = req.body as { username?: unknown } | undefined;
+  if (body && typeof body.username === 'string') {
+    const u = body.username.trim().toLowerCase();
+    if (u.length > 0) return `user:${u}`;
+  }
+  return ipKey(req);
 }
 
 function setSuccessResponse(
@@ -33,10 +50,11 @@ function setSuccessResponse(
 
 const rateLimit = (
   limiter: (key: string) => Promise<{ success: boolean; reset: number }>,
+  keyFn: (req: Request) => string,
 ): RequestHandler =>
   async (req, res, next) => {
     try {
-      const { success, reset } = await limiter(ipKey(req));
+      const { success, reset } = await limiter(keyFn(req));
       if (!success) {
         res.setHeader('Retry-After', Math.max(0, Math.ceil((reset - Date.now()) / 1000)));
         throw new HttpError(429, 'RATE_LIMITED', 'Too many requests');
@@ -58,7 +76,7 @@ const requireJsonContentType: RequestHandler = (req, _res, next) => {
 
 authRouter.post(
   '/login',
-  rateLimit(loginLimiter),
+  rateLimit(loginLimiter, loginKey),
   async (req, res, next) => {
     try {
       const parsed = loginSchema.parse(req.body);
@@ -85,7 +103,8 @@ authRouter.post(
 authRouter.post(
   '/refresh',
   requireJsonContentType,
-  rateLimit(refreshLimiter),
+  // Refresh has no username in body — stays IP-keyed.
+  rateLimit(refreshLimiter, ipKey),
   async (req, res, next) => {
     try {
       const cookieValue = req.cookies[REFRESH_COOKIE_NAME] as string | undefined;

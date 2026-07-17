@@ -8,6 +8,8 @@ import {
   useGetProjectQuery,
   useUpdateProjectMutation,
 } from '../app/api/projectsApi';
+import { useAppSelector } from '../app/hooks';
+import { selectCurrentUser } from '../features/auth/authSlice';
 import { RoleGate } from '../components/auth/RoleGate';
 import { ActionRemarksSection } from '../components/input-sheet/ActionRemarksSection';
 import { BasicInfoSection } from '../components/input-sheet/BasicInfoSection';
@@ -34,22 +36,58 @@ type SectionId =
   | 'om'
   | 'milestones';
 
-const SECTIONS: Array<{ id: SectionId; label: string }> = [
+interface SectionDef {
+  id: SectionId;
+  label: string;
+}
+
+type SectionGroup = 'fixed' | 'variable';
+
+/**
+ * Fixed Inputs — Basic Info + Contract & Security. Only MD/Admin may edit.
+ * Backend also enforces this (see `FIXED_INPUT_KEYS` in projectsService).
+ * Sub-tabs are numbered 01..N within the group (not globally) so the
+ * sequence matches what a user actually clicks through.
+ */
+const FIXED_SECTIONS: SectionDef[] = [
   { id: 'basic', label: '01 Basic Info' },
-  { id: 'phase', label: '02 Phase & Dates' },
-  { id: 'progress', label: '03 Progress & Financial' },
-  { id: 'cos', label: '04 CoS / EoT' },
-  { id: 'contract', label: '05 Contract & Security' },
-  { id: 'geo', label: '06 GeoTagging' },
-  { id: 'action', label: '07 Action & Remarks' },
-  { id: 'om', label: '08 O&M Details' },
-  { id: 'milestones', label: '09 Milestones & Progress' },
+  { id: 'contract', label: '02 Contract & Security' },
 ];
+
+/** Variable Inputs — everything else. Editable by anyone with canUpdate. */
+const VARIABLE_SECTIONS: SectionDef[] = [
+  { id: 'phase', label: '01 Phase & Dates' },
+  { id: 'progress', label: '02 Progress & Financial' },
+  { id: 'cos', label: '03 CoS / EoT' },
+  { id: 'geo', label: '04 GeoTagging' },
+  { id: 'action', label: '05 Action & Remarks' },
+  { id: 'om', label: '06 O&M Details' },
+  { id: 'milestones', label: '07 Milestones & Progress' },
+];
+
+const FIXED_IDS = new Set<SectionId>(FIXED_SECTIONS.map((s) => s.id));
+
+/** Which group a given section belongs to. */
+function groupOf(id: SectionId): SectionGroup {
+  return FIXED_IDS.has(id) ? 'fixed' : 'variable';
+}
+
 
 export function InputSheetPage(): JSX.Element {
   const { projectId } = useParams<{ projectId: string }>();
   const isEdit = Boolean(projectId);
   const navigate = useNavigate();
+  const currentUser = useAppSelector(selectCurrentUser);
+  // MD bypasses granular flags (matches backend requireProjectCreate/Update).
+  const canCreate = currentUser?.role === 'MD' || Boolean(currentUser?.canCreateProjects);
+  const canUpdate = currentUser?.role === 'MD' || Boolean(currentUser?.canUpdateProjects);
+  // Only MD + Admin can change Fixed Input sections (Basic Info + Contract &
+  // Security). Backend also strips those keys from PD/Viewer patches, so this
+  // is UX polish that matches the security boundary.
+  const canEditFixed = currentUser?.role === 'MD' || currentUser?.role === 'Admin';
+  // Creating a project always touches Fixed Input fields (projectName etc.),
+  // so non-Admin/MD can never create — regardless of canCreateProjects.
+  const canSave = isEdit ? canUpdate : (canCreate && canEditFixed);
 
   const detail = useGetProjectQuery(projectId ?? '', { skip: !isEdit });
   const cosEot = useListCosEotForProjectQuery(projectId ?? '', { skip: !isEdit });
@@ -62,6 +100,18 @@ export function InputSheetPage(): JSX.Element {
 
   const [section, setSection] = useState<SectionId>('basic');
   const [flash, setFlash] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const activeGroup: SectionGroup = groupOf(section);
+  const activeSubTabs = activeGroup === 'fixed' ? FIXED_SECTIONS : VARIABLE_SECTIONS;
+
+  /**
+   * Clicking a top-level tab (Fixed / Variable) jumps to that group's first
+   * sub-section. If the user is already inside that group we keep them on
+   * their current sub-tab so a stray click doesn't lose their place.
+   */
+  const openGroup = (g: SectionGroup): void => {
+    if (g === activeGroup) return;
+    setSection((g === 'fixed' ? FIXED_SECTIONS : VARIABLE_SECTIONS)[0]!.id);
+  };
 
   useEffect(() => {
     if (!flash) return;
@@ -119,7 +169,11 @@ export function InputSheetPage(): JSX.Element {
 
   return (
     <RoleGate
-      allow={['Admin', 'MD']}
+      // PD is included: whether they can actually create/update is enforced
+      // by their canCreateProjects/canUpdateProjects flags (checked below
+      // and by the backend). Locking PD out of the page entirely blocks
+      // even the ones the Admin has granted create/update permission to.
+      allow={['Admin', 'MD', 'PD']}
       fallback={
         <div className="rounded-lg border border-[#FCA5A5] bg-[#FEF2F2] p-4 text-sm">
           <p className="font-semibold text-[#B91C1C]">
@@ -157,10 +211,33 @@ export function InputSheetPage(): JSX.Element {
                 {isDirty ? (
                   <span className="ml-1 font-bold text-[#B45309]">Unsaved changes</span>
                 ) : null}
+                {!canSave ? (
+                  <span className="ml-1 font-bold text-[#B91C1C]">
+                    ·{' '}
+                    {!isEdit && !canEditFixed
+                      ? 'Read-only (MD/Admin only can create — Basic Info + Contract & Security are Fixed Inputs)'
+                      : `Read-only (${isEdit ? 'update' : 'create'} permission not granted)`}
+                  </span>
+                ) : null}
+                {canSave && !canEditFixed && isEdit ? (
+                  <span className="ml-1 font-bold text-[#92400E]">
+                    · Fixed Input sections locked to MD/Admin
+                  </span>
+                ) : null}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={handleSave} disabled={busy}>
+              <Button
+                onClick={handleSave}
+                disabled={busy || !canSave}
+                title={
+                  !canSave
+                    ? isEdit
+                      ? 'Your account cannot update projects. Ask an Admin.'
+                      : 'Your account cannot create projects. Ask an Admin.'
+                    : undefined
+                }
+              >
                 {busy ? 'Saving…' : isEdit ? '✓ Save Changes' : '✓ Create Project'}
               </Button>
             </div>
@@ -179,32 +256,70 @@ export function InputSheetPage(): JSX.Element {
           ) : null}
         </header>
 
-        <nav
-          role="tablist"
-          aria-label="Input sheet sections"
-          className="flex flex-wrap gap-0.5 border-b-2 border-[#E5E7EB]"
-        >
-          {SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              role="tab"
-              aria-selected={section === s.id}
-              onClick={() => setSection(s.id)}
-              className={cn(
-                '-mb-0.5 whitespace-nowrap border-b-2 px-3 py-2 text-[11.5px] font-semibold transition-colors',
-                section === s.id
-                  ? 'border-[#1E3A5F] text-[#1E3A5F]'
-                  : 'border-transparent text-[#6B7280] hover:text-[#374151]',
-              )}
-            >
-              {s.label}
-            </button>
-          ))}
-        </nav>
+        {/*
+          Two-level navigation:
+            • Top row — segmented-control style tabs: "Fixed Inputs" and
+              "Variable Inputs". Clicking either opens its sub-tab strip.
+            • Bottom row — the active group's sub-tabs, renumbered 01..N
+              per group so the sequence reflects what the user sees.
+          Fixed Inputs shows a 🔒 for non-MD/Admin users so the read-only
+          status of Basic Info + Contract & Security is obvious at a glance.
+        */}
+        <div className="space-y-2">
+          <div
+            role="tablist"
+            aria-label="Input group"
+            className="inline-flex rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] p-1 shadow-inner"
+          >
+            <GroupTab
+              label="Fixed Inputs"
+              count={FIXED_SECTIONS.length}
+              active={activeGroup === 'fixed'}
+              locked={!canEditFixed}
+              lockedNote="MD/Admin only"
+              onClick={() => openGroup('fixed')}
+            />
+            <GroupTab
+              label="Variable Inputs"
+              count={VARIABLE_SECTIONS.length}
+              active={activeGroup === 'variable'}
+              locked={false}
+              onClick={() => openGroup('variable')}
+            />
+          </div>
+
+          <nav
+            role="tablist"
+            aria-label={`${activeGroup === 'fixed' ? 'Fixed' : 'Variable'} input sub-sections`}
+            className="flex flex-wrap gap-0.5 border-b-2 border-[#E5E7EB]"
+          >
+            {activeSubTabs.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                role="tab"
+                aria-selected={section === s.id}
+                onClick={() => setSection(s.id)}
+                className={cn(
+                  '-mb-0.5 inline-flex items-center gap-1 whitespace-nowrap border-b-2 px-3 py-2 text-[11.5px] font-semibold transition-colors',
+                  section === s.id
+                    ? 'border-[#1E3A5F] text-[#1E3A5F]'
+                    : 'border-transparent text-[#6B7280] hover:text-[#374151]',
+                )}
+              >
+                {activeGroup === 'fixed' && !canEditFixed ? (
+                  <span aria-hidden className="text-[10px]">🔒</span>
+                ) : null}
+                {s.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         <div>
-          {section === 'basic' ? <BasicInfoSection draft={draft} setField={setField} /> : null}
+          {section === 'basic' ? (
+            <BasicInfoSection draft={draft} setField={setField} readOnly={!canEditFixed} />
+          ) : null}
           {section === 'phase' ? (
             <PhaseDatesSection
               draft={draft}
@@ -223,7 +338,7 @@ export function InputSheetPage(): JSX.Element {
             <CosEotSection projectId={projectId ?? null} items={cosEot.data?.items ?? []} />
           ) : null}
           {section === 'contract' ? (
-            <ContractSecuritySection draft={draft} setField={setField} />
+            <ContractSecuritySection draft={draft} setField={setField} readOnly={!canEditFixed} />
           ) : null}
           {section === 'geo' ? (
             <GeoTaggingSection
@@ -264,6 +379,59 @@ export function InputSheetPage(): JSX.Element {
         </footer>
       </article>
     </RoleGate>
+  );
+}
+
+/**
+ * Top-level segmented-control tab. Two of these ("Fixed Inputs" / "Variable
+ * Inputs") sit above the sub-tab strip. The active one gets the navy fill;
+ * `locked` overlays a 🔒 for PD/Viewer users so they know the Fixed group
+ * opens read-only. `count` is a subtle "· 2" chip showing sub-tab count.
+ */
+function GroupTab({
+  label, count, active, locked, lockedNote, onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  locked: boolean;
+  lockedNote?: string;
+  onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-2 rounded-md px-4 py-1.5 text-[12.5px] font-bold transition-colors',
+        active
+          ? 'bg-[#1E3A5F] text-white shadow'
+          : 'bg-transparent text-[#374151] hover:bg-white hover:text-[#111827]',
+      )}
+    >
+      {locked ? <span aria-hidden className="text-[12px]">🔒</span> : null}
+      <span>{label}</span>
+      <span
+        className={cn(
+          'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+          active ? 'bg-white/20 text-white' : 'bg-[#E5E7EB] text-[#6B7280]',
+        )}
+      >
+        {count}
+      </span>
+      {locked && lockedNote ? (
+        <span
+          className={cn(
+            'ml-0.5 text-[10px] italic',
+            active ? 'text-white/80' : 'text-[#92400E]',
+          )}
+        >
+          · {lockedNote}
+        </span>
+      ) : null}
+    </button>
   );
 }
 

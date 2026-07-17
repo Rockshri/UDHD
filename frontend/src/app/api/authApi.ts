@@ -26,6 +26,11 @@ export const authApi = api.injectEndpoints({
           // full AuthResponse. The needsDivision case is step 1 of the
           // PD handshake — no session yet.
           if (isAuthResponse(data)) {
+            // Phase C2 — wipe every RTK Query cache entry before binding
+            // the new identity. Prevents an MD's cached KPI/Project
+            // payloads from being served to a PD who signs in next
+            // (same endpoint + same undefined args = cache hit).
+            dispatch(api.util.resetApiState());
             dispatch(setCredentials(data));
             if (data.user.role === 'MD') {
               dispatch(openMdBriefing());
@@ -54,8 +59,12 @@ export const authApi = api.injectEndpoints({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          // Refresh is silent token rotation for the SAME user — cache
+          // stays valid. Only setCredentials, no resetApiState().
           dispatch(setCredentials(data));
         } catch {
+          // Refresh failed — session is gone; wipe cache along with it.
+          dispatch(api.util.resetApiState());
           dispatch(clearCredentials());
         }
       },
@@ -67,6 +76,9 @@ export const authApi = api.injectEndpoints({
         try {
           await queryFulfilled;
         } finally {
+          // Wipe every RTK Query cache entry on sign-out so the next user
+          // (potentially a different role) starts with a blank slate.
+          dispatch(api.util.resetApiState());
           dispatch(clearCredentials());
         }
       },

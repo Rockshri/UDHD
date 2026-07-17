@@ -15,7 +15,10 @@ import {
   Tag,
   X,
 } from 'lucide-react';
+import { useAppSelector } from '../../app/hooks';
+import { selectCurrentUser } from '../../features/auth/authSlice';
 import { cn } from '../../lib/utils';
+import type { UserRole } from '../../types/api';
 
 /**
  * Primary navigation (Read.md §1). Order matches the spec exactly; labels
@@ -26,15 +29,23 @@ interface NavItem {
   label: string;
   Icon: typeof LayoutDashboard;
   end?: boolean;
+  /** Roles this item is hidden for. Absent = shown to everyone. */
+  hideFor?: UserRole[];
 }
 
+/**
+ * Phase C2 — PDs are pinned to a single division and shouldn't be looking
+ * at portfolio-wide District/Division breakdowns. Hidden client-side in
+ * the sidebar (spec choice: hide entirely). Backend also filters for
+ * defence-in-depth if a PD types the URL manually.
+ */
 const PRIMARY_NAV: NavItem[] = [
   { to: '/',                    label: 'Overview',           Icon: LayoutDashboard, end: true },
   { to: '/sectors',             label: 'Sectors',            Icon: Tag },
   { to: '/schemes',             label: 'Schemes',            Icon: FolderTree },
   { to: '/projects',            label: 'Projects',           Icon: ClipboardList },
-  { to: '/districts',           label: 'Districts',          Icon: MapPin },
-  { to: '/divisions',           label: 'Divisions',          Icon: Map },
+  { to: '/districts',           label: 'Districts',          Icon: MapPin, hideFor: ['PD'] },
+  { to: '/divisions',           label: 'Divisions',          Icon: Map,    hideFor: ['PD'] },
   { to: '/cos-eot',             label: 'CoS / EoT',          Icon: FileEdit },
   { to: '/management-actions',  label: 'Management Action',  Icon: CheckSquare },
   { to: '/gaps',                label: 'Outstanding Gaps',   Icon: AlertTriangle },
@@ -53,6 +64,12 @@ interface Props {
 export function Sidebar({
   collapsed, onToggleCollapsed, mobileOpen, onCloseMobile,
 }: Props): JSX.Element {
+  const currentUser = useAppSelector(selectCurrentUser);
+  const role = currentUser?.role;
+  const visibleNav = PRIMARY_NAV.filter(
+    (item) => !item.hideFor || !role || !item.hideFor.includes(role),
+  );
+
   // Close mobile drawer on Escape (matches modal convention).
   useEffect(() => {
     if (!mobileOpen) return;
@@ -132,7 +149,7 @@ export function Sidebar({
         {/* Nav list */}
         <nav className="flex-1 overflow-y-auto py-2" aria-label="Primary">
           <ul className="flex flex-col gap-0.5 px-2">
-            {PRIMARY_NAV.map((item) => (
+            {visibleNav.map((item) => (
               <li key={item.to}>
                 <SidebarLink
                   to={item.to}

@@ -37,8 +37,17 @@ function build(prefix: string, limiter: ReturnType<typeof Ratelimit.slidingWindo
   };
 }
 
-/** 5 attempts per 15 minutes, per IP. */
-export const loginLimiter = build('rl:auth:login', Ratelimit.slidingWindow(5, '15 m'));
+/**
+ * 20 attempts per 15 minutes, per IP.
+ *
+ * Chosen with the PD two-step login in mind — each PD sign-in makes two
+ * POSTs to /auth/login (credentials → then divisionId), so the old 5/15min
+ * budget only allowed 2.5 PD sessions per window. 20/15min still blocks
+ * credential brute-force (average ~1.3/min sustained) but doesn't lock out
+ * a real MD/Admin/PD who typos their password once or logs in a few times
+ * during the day. Increase further if legitimate lockouts happen in prod.
+ */
+export const loginLimiter = build('rl:auth:login', Ratelimit.slidingWindow(20, '15 m'));
 
 /** 20 refresh calls per minute, per IP. */
 export const refreshLimiter = build('rl:auth:refresh', Ratelimit.slidingWindow(20, '1 m'));

@@ -1,4 +1,6 @@
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
+import { useAppSelector } from '../../app/hooks';
+import { selectCurrentUser } from '../../features/auth/authSlice';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { cn } from '../../lib/utils';
@@ -26,10 +28,24 @@ export function ProjectsFilterBar({
   totalRows,
 }: Props): JSX.Element {
   const { data: lookups } = useGetLookupsQuery();
+  const currentUser = useAppSelector(selectCurrentUser);
+
+  // PDs are pinned to a division — their Region + Division filters lock to
+  // whatever they picked at login. Backend enforces this too (sessionDivisionId
+  // wins over query-string divisionId), but the UI shouldn't tease them with
+  // a picker that can't change anything.
+  const isPd = currentUser?.role === 'PD';
+  const pdDivision = isPd && currentUser.divisionId !== undefined
+    ? lookups?.divisions.find((d) => d.divisionId === currentUser.divisionId) ?? null
+    : null;
+  const pdRegion = pdDivision
+    ? lookups?.regions.find((r) => r.regionId === pdDivision.regionId) ?? null
+    : null;
 
   return (
     <div className="space-y-2 rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-sm">
-      <div className="grid gap-2 lg:grid-cols-[1.5fr_repeat(6,_1fr)]">
+      {/* Row 1 — 5 selects (down from 6, District removed). */}
+      <div className="grid gap-2 lg:grid-cols-[1.5fr_repeat(5,_1fr)]">
         <label className="grid gap-1">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">Search</span>
           <Input
@@ -71,45 +87,46 @@ export function ProjectsFilterBar({
             lookups?.sectors.map((s) => ({ value: String(s.sectorId), label: s.sectorName })) ?? []
           }
         />
-        <Select
-          label="District"
-          value={filters.districtId}
-          onChange={(v) => setFilter('districtId', v)}
-          options={
-            lookups?.districts.map((d) => ({
-              value: String(d.districtId),
-              label: d.districtName,
-            })) ?? []
-          }
-        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-1">
-        <Select
-          label="Region"
-          value={filters.regionId}
-          onChange={(v) => {
-            // Changing region resets division so the sub-filter doesn't
-            // point at a division outside the newly-picked region.
-            setFilter('regionId', v);
-            if (filters.divisionId) setFilter('divisionId', '');
-          }}
-          options={
-            lookups?.regions.map((r) => ({ value: String(r.regionId), label: r.regionName })) ?? []
-          }
-          compact
-        />
-        <Select
-          label="Division"
-          value={filters.divisionId}
-          onChange={(v) => setFilter('divisionId', v)}
-          options={
-            (lookups?.divisions ?? [])
-              .filter((d) => !filters.regionId || String(d.regionId) === filters.regionId)
-              .map((d) => ({ value: String(d.divisionId), label: d.divisionName }))
-          }
-          compact
-        />
+        {isPd ? (
+          // PD's Region + Division are read-only, pinned to their session's
+          // division from JWT. Show a locked pill for each so the context
+          // is visible without inviting an interaction that can't succeed.
+          <>
+            <LockedPill label="Region" value={pdRegion?.regionName ?? '—'} />
+            <LockedPill label="Division" value={pdDivision?.divisionName ?? '—'} />
+          </>
+        ) : (
+          <>
+            <Select
+              label="Region"
+              value={filters.regionId}
+              onChange={(v) => {
+                // Changing region resets division so the sub-filter doesn't
+                // point at a division outside the newly-picked region.
+                setFilter('regionId', v);
+                if (filters.divisionId) setFilter('divisionId', '');
+              }}
+              options={
+                lookups?.regions.map((r) => ({ value: String(r.regionId), label: r.regionName })) ?? []
+              }
+              compact
+            />
+            <Select
+              label="Division"
+              value={filters.divisionId}
+              onChange={(v) => setFilter('divisionId', v)}
+              options={
+                (lookups?.divisions ?? [])
+                  .filter((d) => !filters.regionId || String(d.regionId) === filters.regionId)
+                  .map((d) => ({ value: String(d.divisionId), label: d.divisionName }))
+              }
+              compact
+            />
+          </>
+        )}
         <Select
           label="Scheme"
           value={filters.schemeId}
@@ -182,5 +199,29 @@ function Select({ label, value, onChange, options, compact }: SelectProps): JSX.
         ))}
       </select>
     </label>
+  );
+}
+
+/**
+ * Read-only counterpart to <Select> used when the filter is dictated by the
+ * session (e.g. a PD's Region + Division from JWT). Visually mirrors the
+ * disabled dropdown look but signals with a 🔒 that it's session-locked,
+ * not just empty.
+ */
+function LockedPill({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="grid min-w-[200px] gap-1">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
+        {label}
+      </span>
+      <div
+        className="flex h-9 w-full items-center gap-1.5 rounded border border-[#E5E7EB] bg-[#F3F4F6] px-2 text-sm text-[#374151]"
+        title={`${label} is locked to your assigned ${label.toLowerCase()} for this session.`}
+        aria-label={`${label}: ${value} (locked)`}
+      >
+        <span aria-hidden className="text-[11px]">🔒</span>
+        <span className="truncate font-semibold">{value}</span>
+      </div>
+    </div>
   );
 }

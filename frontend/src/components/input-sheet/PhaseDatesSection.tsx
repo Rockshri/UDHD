@@ -88,7 +88,7 @@ export function PhaseDatesSection({ draft, setField, cosItems }: Props): JSX.Ele
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="02"
+          num="01"
           title="Phase, Status & Dates"
           sub="Revised End Date auto-fills from the latest CoS if left blank"
         />
