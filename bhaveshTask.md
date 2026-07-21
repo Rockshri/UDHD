@@ -1,46 +1,206 @@
-Objective:
-Improve the mobile navigation by relocating all desktop top navbar action buttons into the mobile sidebar. All sidebar content should scroll together as a single container.
+Objective
 
-Requirements
+Redesign the existing BUIDCo Login Page using a modern government-portal style inspired by contemporary administrative dashboards and authentication portals.
 
-1. Move Desktop Top Navigation Items
-    * Remove the separate top action bar from the mobile view.
-    * Append all desktop top navbar actions to the bottom of the mobile sidebar in a separate section.
-    * Include the following items:
-        * Input Sheet
-        * MD Portfolio Briefing
-        * MoM
-        * O&M
-        * KPI Guide
-        * Audit Trail
-        * Users
-2. Create a Separate Sidebar Section
-    * Add a section below the existing navigation menu (Overview, Sectors, Schemes, Projects, etc.).
-    * Add a section title such as “Quick Actions” or “Management Tools”.
-    * Preserve the existing icons, labels, styling, and click functionality for each action.
-3. Single Scrollable Sidebar
-    * The entire sidebar (navigation items + Quick Actions section) must be contained within one scrollable container.
-    * When the user scrolls, both sections should scroll together seamlessly.
-    * Do not create independent scroll areas for different sections.
-4. Maintain Existing Functionality
-    * Clicking any action should behave exactly as it does in the desktop version.
-    * Do not change routes, permissions, or business logic.
-    * Preserve active/selected states.
-5. Responsive Behaviour
-    * Desktop & Tablet: Keep the existing top navbar unchanged.
-    * Mobile: Hide the desktop action bar and display these actions only inside the sidebar.
-6. Sidebar Layout
-    * Existing navigation menu appears first.
-    * Divider or spacing.
-    * Quick Actions section containing all top navbar buttons.
-    * Entire sidebar remains responsive and easy to navigate.
+The goal is to create a premium, professional, and secure-looking login experience while prominently showcasing the provided BUIDCo branding image.
 
-Acceptance Criteria
+Important Constraints
+Do Not Change Functionality
+Do not modify any authentication logic.
+Do not change any JavaScript behavior.
+Do not change API calls.
+Do not change routes.
+Do not change form submission logic.
+Do not change validation logic.
+Do not change IDs, names, or event handlers.
+Do not alter backend integration.
+Scope
+CSS changes only.
+Minimal HTML structure changes only if absolutely necessary for layout.
+Preserve the current architecture.
+Design Requirements
+1. Create a Modern Split-Screen Layout
 
-* ✅ Desktop layout remains unchanged.
-* ✅ Mobile top navbar contains only the logo and hamburger menu.
-* ✅ All desktop action buttons appear at the bottom of the mobile sidebar.
-* ✅ Navigation items and Quick Actions scroll together as a single scrollable list.
-* ✅ No nested scrolling or overflow issues.
-* ✅ Icons, labels, active states, and navigation functionality remain intact.
-* ✅ Sidebar is fully responsive and works smoothly on all mobile screen sizes.
+Transform the login page into a professional two-panel design.
+
+Left Branding Panel
+
+Use approximately 45–50% of the screen width.
+
+Include:
+
+The provided BUIDCo image/logo as the primary visual element.
+Organization branding.
+Optional tagline if available.
+A visually appealing government/corporate theme.
+
+Styling:
+
+Deep blue gradient background.
+Professional appearance.
+Centered content.
+Balanced spacing.
+Strong visual identity.
+
+The branding panel should feel like a government command center or enterprise portal.
+
+Right Authentication Panel
+
+Use approximately 50–55% of the screen width.
+
+Include:
+
+Large welcome heading.
+Short descriptive subtitle.
+Login form.
+Clean white background.
+
+The panel should feel modern, secure, and uncluttered.
+
+2. Typography Improvements
+
+Create a strong visual hierarchy.
+
+Heading
+
+Large bold heading similar to:
+
+"Welcome to BUIDCo Portal"
+
+Characteristics:
+
+Large font size
+Bold weight
+High contrast
+Professional appearance
+Subtitle
+
+Smaller supporting text explaining portal access.
+
+Characteristics:
+
+Medium weight
+Muted color
+Good spacing below heading
+3. Modern Input Field Design
+
+Redesign all login inputs.
+
+Requirements:
+
+Rounded corners
+Increased padding
+Modern appearance
+Soft borders
+Clean typography
+Consistent sizing
+Focus State
+
+When focused:
+
+Smooth transition
+Border highlight
+Subtle glow effect
+Accessible contrast
+4. Login Button Redesign
+
+Modernize the login button.
+
+Requirements:
+
+Full-width button
+Rounded corners
+Professional gradient background
+Strong contrast
+Comfortable height
+
+Hover Effects:
+
+Slight elevation
+Smooth transition
+Premium appearance
+5. Color Palette
+
+Use a professional government-enterprise palette.
+
+Suggested colors:
+
+Primary
+Deep Navy Blue
+Royal Blue
+Secondary
+White
+Light Gray
+Accent
+Subtle BUIDCo brand colors derived from the provided logo
+
+Avoid:
+
+Overly bright colors
+Flashy gradients
+Excessive animations
+6. Card and Container Styling
+
+Improve the overall login container.
+
+Requirements:
+
+Soft shadow
+Modern border radius
+Better spacing
+Improved visual depth
+
+The page should feel polished and enterprise-grade.
+
+7. Visual Hierarchy
+
+Ensure the following order of attention:
+
+BUIDCo Branding
+Welcome Heading
+Login Form
+Login Button
+Secondary Links
+
+The user's eye should naturally flow through the page.
+
+8. Responsive Design
+
+The page must remain fully responsive.
+
+Desktop
+Two-column layout
+Branding panel on left
+Login panel on right
+Tablet
+Maintain balance
+Reduce spacing appropriately
+Mobile
+Stack sections vertically
+Branding section on top
+Login form below
+No horizontal scrolling
+
+Requirements:
+
+No overflow
+No broken layout
+No clipped content
+Proper scaling of logo/image
+9. Accessibility
+
+Ensure:
+
+Readable text contrast
+Visible focus indicators
+Proper spacing
+Mobile-friendly touch targets
+10. Code Quality
+
+Before making changes:
+
+Analyze the existing CSS structure.
+Reuse current styles where possible.
+Make only the minimum necessary modifications.
+Keep code maintainable.
+Avoid unnecessary rewrites.

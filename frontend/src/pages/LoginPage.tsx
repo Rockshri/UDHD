@@ -3,9 +3,8 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useLoginMutation } from '../app/api/authApi';
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated } from '../features/auth/authSlice';
+import buidcoPic from '../assets/BUIDCo_pic.jpg';
 import { Button } from '../components/ui/button';
-import { BuidcoLogo } from '../components/layout/BuidcoLogo';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 
 interface LocationState {
@@ -16,6 +15,19 @@ interface PdDivision {
   divisionId: number;
   divisionName: string;
 }
+
+/** Shared classNames for the redesigned inputs/buttons — kept local to this
+ *  page so the shared ui/input.tsx and ui/button.tsx (used everywhere else
+ *  in the app) stay untouched. Purely presentational; no behavior here. */
+const inputClassName =
+  'h-11 rounded-xl border-[#D1D5DB] px-4 text-sm transition-all duration-200 ' +
+  'focus-visible:border-[#1D4ED8] focus-visible:ring-4 focus-visible:ring-[#1D4ED8]/15 focus-visible:ring-offset-0';
+const primaryButtonClassName =
+  'h-12 rounded-xl bg-gradient-to-r from-[#1E3A5F] to-[#1D4ED8] text-[15px] font-semibold ' +
+  'shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:from-[#17304d] hover:to-[#1741b0] hover:shadow-lg ' +
+  'active:translate-y-0';
+const secondaryButtonClassName =
+  'h-12 rounded-xl border-[#D1D5DB] text-[15px] font-semibold transition-all duration-200 hover:-translate-y-0.5';
 
 export function LoginPage(): JSX.Element {
   const [username, setUsername] = useState('');
@@ -65,111 +77,151 @@ export function LoginPage(): JSX.Element {
   const errorMessage = extractErrorMessage(error);
 
   return (
-    <div className="grid min-h-screen place-items-center bg-[#F4F6F9] px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center gap-3 pb-4 text-center">
-          <BuidcoLogo size={44} />
-          <div>
-            <CardTitle className="text-base font-bold normal-case tracking-normal text-[#111827]">
-              BUIDCO Project Monitoring
-            </CardTitle>
-            <p className="mt-1 text-[11px] uppercase tracking-wider text-[#6B7280]">
-              Sign in to continue
+    <div className="flex min-h-screen items-center justify-center bg-[#EEF1F6] p-4 sm:p-6 lg:p-10">
+      <div className="grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-2xl bg-white shadow-2xl lg:grid-cols-[46%_54%]">
+        {/* ── Left branding panel ── */}
+        <div className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#0B1C33] via-[#152C4D] to-[#1D4ED8] px-8 py-10 text-center sm:py-14 lg:py-12">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)',
+              backgroundSize: '20px 20px',
+            }}
+          />
+          <div className="relative z-10 flex flex-col items-center gap-6">
+            <div className="h-44 w-36 overflow-hidden rounded-2xl bg-white shadow-lg sm:h-52 sm:w-[172px]">
+              <img
+                src={buidcoPic}
+                alt="BUIDCO — Building Better Tomorrow"
+                className="h-full w-full object-cover"
+                style={{ objectPosition: 'center 22%' }}
+              />
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-wide text-white sm:text-3xl">
+                BUIDCO
+              </h1>
+              <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#93C5FD]">
+                Project Monitoring System
+              </p>
+            </div>
+            <p className="max-w-xs text-sm leading-relaxed text-[#CBD5E1]">
+              A unified command center for tracking every BUIDCO project —
+              from sanction to completion.
             </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-3" onSubmit={onSubmit}>
-            {pdDivisions ? (
-              // ── Step 2 — PD division picker ──
-              <>
-                <div className="rounded border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-[12px] text-[#1E3A5F]">
-                  <p className="font-semibold">Signed in as {username}</p>
-                  <p className="mt-0.5 text-[11.5px] text-[#374151]">
-                    You're a Project Director. Choose which division you're
-                    working in for this session.
-                  </p>
-                </div>
-                <label className="grid gap-1 text-xs font-semibold text-[#374151]">
-                  Division
-                  <select
-                    required
-                    value={selectedDivisionId ?? ''}
-                    onChange={(e) => setSelectedDivisionId(Number(e.target.value))}
-                    className="h-9 w-full rounded border border-[#D1D5DB] bg-white px-2 text-sm text-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A5F] focus-visible:ring-offset-1"
-                  >
-                    {pdDivisions.map((d) => (
-                      <option key={d.divisionId} value={d.divisionId}>
-                        {d.divisionName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {errorMessage ? (
-                  <p
-                    className="rounded border border-[#FCA5A5] bg-[#FEF2F2] px-3 py-2 text-xs font-medium text-[#B91C1C]"
-                    role="alert"
-                  >
-                    {errorMessage}
-                  </p>
-                ) : null}
-                <div className="flex items-center gap-2">
+        </div>
+
+        {/* ── Right authentication panel ── */}
+        <div className="flex flex-col justify-center bg-white px-6 py-10 sm:px-10 sm:py-12 lg:px-14">
+          <div className="mx-auto w-full max-w-sm">
+            <h2 className="text-2xl font-extrabold text-[#111827] sm:text-3xl">
+              Welcome to BUIDCo Portal
+            </h2>
+            <p className="mt-2 text-sm text-[#6B7280]">
+              Sign in with your credentials to access the project dashboard.
+            </p>
+
+            <form className="mt-8 space-y-4" onSubmit={onSubmit}>
+              {pdDivisions ? (
+                // ── Step 2 — PD division picker ──
+                <>
+                  <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-[12px] text-[#1E3A5F]">
+                    <p className="font-semibold">Signed in as {username}</p>
+                    <p className="mt-0.5 text-[11.5px] text-[#374151]">
+                      You're a Project Director. Choose which division you're
+                      working in for this session.
+                    </p>
+                  </div>
+                  <label className="grid gap-1.5 text-xs font-semibold text-[#374151]">
+                    Division
+                    <select
+                      required
+                      value={selectedDivisionId ?? ''}
+                      onChange={(e) => setSelectedDivisionId(Number(e.target.value))}
+                      className="h-11 w-full rounded-xl border border-[#D1D5DB] bg-white px-4 text-sm text-[#111827] transition-all duration-200 focus-visible:border-[#1D4ED8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1D4ED8]/15"
+                    >
+                      {pdDivisions.map((d) => (
+                        <option key={d.divisionId} value={d.divisionId}>
+                          {d.divisionName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {errorMessage ? (
+                    <p
+                      className="rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] px-4 py-2.5 text-xs font-medium text-[#B91C1C]"
+                      role="alert"
+                    >
+                      {errorMessage}
+                    </p>
+                  ) : null}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      type="submit"
+                      className={`flex-1 ${primaryButtonClassName}`}
+                      disabled={isLoading || selectedDivisionId === null}
+                    >
+                      {isLoading ? 'Signing in…' : 'Continue'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={restartLogin}
+                      disabled={isLoading}
+                      className={secondaryButtonClassName}
+                    >
+                      ← Back
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                // ── Step 1 — credentials (all roles) ──
+                <>
+                  <label className="grid gap-1.5 text-xs font-semibold text-[#374151]">
+                    Username
+                    <Input
+                      autoComplete="username"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="e.g. shri"
+                      className={inputClassName}
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-[#374151]">
+                    Password
+                    <Input
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={inputClassName}
+                    />
+                  </label>
+                  {errorMessage ? (
+                    <p
+                      className="rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] px-4 py-2.5 text-xs font-medium text-[#B91C1C]"
+                      role="alert"
+                    >
+                      {errorMessage}
+                    </p>
+                  ) : null}
                   <Button
                     type="submit"
-                    className="flex-1"
-                    disabled={isLoading || selectedDivisionId === null}
-                  >
-                    {isLoading ? 'Signing in…' : 'Continue'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={restartLogin}
+                    className={`w-full ${primaryButtonClassName}`}
                     disabled={isLoading}
                   >
-                    ← Back
+                    {isLoading ? 'Signing in…' : 'Sign in'}
                   </Button>
-                </div>
-              </>
-            ) : (
-              // ── Step 1 — credentials (all roles) ──
-              <>
-                <label className="grid gap-1 text-xs font-semibold text-[#374151]">
-                  Username
-                  <Input
-                    autoComplete="username"
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. shri"
-                  />
-                </label>
-                <label className="grid gap-1 text-xs font-semibold text-[#374151]">
-                  Password
-                  <Input
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </label>
-                {errorMessage ? (
-                  <p
-                    className="rounded border border-[#FCA5A5] bg-[#FEF2F2] px-3 py-2 text-xs font-medium text-[#B91C1C]"
-                    role="alert"
-                  >
-                    {errorMessage}
-                  </p>
-                ) : null}
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Signing in…' : 'Sign in'}
-                </Button>
-              </>
-            )}
-          </form>
-        </CardContent>
-      </Card>
+                </>
+              )}
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
