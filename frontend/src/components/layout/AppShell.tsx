@@ -7,6 +7,7 @@ import {
   selectShowMdBriefing,
 } from '../../features/auth/authSlice';
 import { MdSchemeSummaryModal } from '../md/MdSchemeSummaryModal';
+import { KpiGuideDrawer } from './KpiGuideDrawer';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
 
@@ -30,6 +31,7 @@ export function AppShell(): JSX.Element {
   const showMdBriefing = useAppSelector(selectShowMdBriefing);
   const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed());
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+  const [kpiOpen, setKpiOpen] = useState<boolean>(false);
   const location = useLocation();
 
   // Auto-close the mobile drawer whenever the user navigates. On desktop the
@@ -56,13 +58,17 @@ export function AppShell(): JSX.Element {
         style={{ backgroundImage: `url(${BUIDCO_LOGO_URI})` }}
       />
       <div className="relative z-10 flex min-h-screen flex-col">
-        <TopNav onOpenMobileNav={() => setMobileOpen(true)} />
+        <TopNav
+          onOpenMobileNav={() => setMobileOpen(true)}
+          onOpenKpiGuide={() => setKpiOpen(true)}
+        />
         <div className="flex flex-1">
           <Sidebar
             collapsed={collapsed}
             onToggleCollapsed={toggleCollapsed}
             mobileOpen={mobileOpen}
             onCloseMobile={() => setMobileOpen(false)}
+            onOpenKpiGuide={() => setKpiOpen(true)}
           />
           <main className="min-w-0 flex-1 px-4 py-6">
             <div className="mx-auto max-w-[1400px]">
@@ -75,6 +81,7 @@ export function AppShell(): JSX.Element {
         open={showMdBriefing}
         onClose={() => dispatch(dismissMdBriefing())}
       />
+      <KpiGuideDrawer open={kpiOpen} onClose={() => setKpiOpen(false)} />
     </div>
   );
 }

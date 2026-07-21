@@ -19,6 +19,9 @@ import { useAppSelector } from '../../app/hooks';
 import { selectCurrentUser } from '../../features/auth/authSlice';
 import { cn } from '../../lib/utils';
 import type { UserRole } from '../../types/api';
+import { NavClock } from './NavClock';
+import { UserPill } from './UserPill';
+import { UtilityNavCluster } from './UtilityNav';
 
 /**
  * Primary navigation (Read.md §1). Order matches the spec exactly; labels
@@ -59,10 +62,12 @@ interface Props {
   /** Mobile drawer open state (transient). */
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  /** Opens the KPI reference guide drawer (mobile copy of TopNav's button). */
+  onOpenKpiGuide: () => void;
 }
 
 export function Sidebar({
-  collapsed, onToggleCollapsed, mobileOpen, onCloseMobile,
+  collapsed, onToggleCollapsed, mobileOpen, onCloseMobile, onOpenKpiGuide,
 }: Props): JSX.Element {
   const currentUser = useAppSelector(selectCurrentUser);
   const role = currentUser?.role;
@@ -146,7 +151,9 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* Nav list */}
+        {/* Nav list — single scrollable container for both the primary
+            navigation and (mobile-only) the Quick Actions section below it,
+            so the two never scroll independently of one another. */}
         <nav className="flex-1 overflow-y-auto py-2" aria-label="Primary">
           <ul className="flex flex-col gap-0.5 px-2">
             {visibleNav.map((item) => (
@@ -162,7 +169,32 @@ export function Sidebar({
               </li>
             ))}
           </ul>
+
+          {/* Quick Actions — TopNav's utility pills/KPI Guide/Audit Trail/
+              Users don't fit in the header row below `lg`, so they live
+              here instead, in the same scroll container as the nav above. */}
+          <div className="mt-4 border-t border-[#E5E7EB] px-2 pt-3 lg:hidden">
+            <div className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
+              Quick Actions
+            </div>
+            <UtilityNavCluster
+              onNavigate={onCloseMobile}
+              onOpenKpiGuide={onOpenKpiGuide}
+              className="flex flex-col items-stretch gap-1.5"
+            />
+          </div>
         </nav>
+
+        {/* Account footer — mobile only; clock + user pill/sign-out relocate
+            here so the mobile top bar is just hamburger + logo. Sits below
+            the scrollable region (not part of it — it's account chrome, not
+            a nav item or quick action). */}
+        <div className="flex shrink-0 flex-col gap-2 border-t border-[#E5E7EB] px-2 py-2 lg:hidden">
+          <div className="px-0.5">
+            <NavClock />
+          </div>
+          <UserPill compact />
+        </div>
       </aside>
     </>
   );

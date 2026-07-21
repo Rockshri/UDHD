@@ -1,84 +1,24 @@
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
-import { useLogoutMutation } from '../../app/api/authApi';
-import { useGetLookupsQuery } from '../../app/api/lookupsApi';
-import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import {
-  openMdBriefing,
-  selectCurrentUser,
-} from '../../features/auth/authSlice';
-import { cn } from '../../lib/utils';
-import type { UserRole } from '../../types/api';
-import { RoleGate } from '../auth/RoleGate';
 import { BuidcoLogo } from './BuidcoLogo';
-import { KpiGuideDrawer } from './KpiGuideDrawer';
 import { NavClock } from './NavClock';
-
-/** Full-form role labels for the header user pill (PD_role.md §2/§3). */
-const ROLE_DISPLAY: Record<UserRole, string> = {
-  MD: 'Managing Director',
-  Admin: 'Admin',
-  PD: 'Project Director',
-  Viewer: 'Viewer',
-};
-
-/**
- * The 10 primary-nav items moved into the left sidebar per Read.md §1.
- * TopNav now only carries the utility pills (Input Sheet / MoM / O&M),
- * MD-only chips (Audit Trail / Users / MD Briefing), KPI Guide, clock,
- * and user pill — per user's chosen scoping.
- */
-interface NavItem {
-  to: string;
-  label: string;
-  icon?: string;
-  end?: boolean;
-}
-
-const UTILITY_NAV_BEFORE_MOM: NavItem[] = [
-  { to: '/input-sheet', label: 'Input Sheet', icon: '📋' },
-];
-const UTILITY_NAV_MOM_ONWARDS: NavItem[] = [
-  { to: '/mom', label: 'MoM', icon: '📅' },
-  { to: '/om', label: 'O&M', icon: '🔧' },
-];
-
-const utilityLinkClass = ({ isActive }: { isActive: boolean }): string =>
-  cn(
-    'inline-flex items-center gap-1.5 whitespace-nowrap rounded px-2.5 py-1.5 text-[11.5px] transition-colors border',
-    isActive
-      ? 'border-transparent bg-[#1E3A5F] font-bold text-white'
-      : 'border-[#E5E7EB] bg-white font-medium text-[#374151] hover:bg-[#F9FAFB]',
-  );
+import { UserPill } from './UserPill';
+import { UtilityNavCluster } from './UtilityNav';
 
 interface TopNavProps {
   /** Opens the mobile sidebar drawer (< lg only). */
   onOpenMobileNav: () => void;
+  /** Opens the KPI reference guide drawer (state lives in AppShell so both
+   *  the desktop TopNav button and the mobile drawer's copy can trigger it). */
+  onOpenKpiGuide: () => void;
 }
 
-export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
-  // Lookups powers the division-name label for PD pills. Query is cheap
-  // (cached 1h in RTK Query) and skipped for non-authenticated sessions.
-  const { data: lookups } = useGetLookupsQuery();
-  const user = useAppSelector(selectCurrentUser);
-  const dispatch = useAppDispatch();
-  const [logout, { isLoading: loggingOut }] = useLogoutMutation();
-  const navigate = useNavigate();
-  const [kpiOpen, setKpiOpen] = useState(false);
-
-  const onSignOut = async (): Promise<void> => {
-    try {
-      await logout().unwrap();
-    } catch {
-      /* clearCredentials still fires from the mutation's onQueryStarted finally. */
-    }
-    navigate('/login', { replace: true });
-  };
-
+export function TopNav({ onOpenMobileNav, onOpenKpiGuide }: TopNavProps): JSX.Element {
   return (
     <header className="sticky top-0 z-50 border-b border-[#E5E7EB] bg-white shadow-[0_1px_5px_rgba(0,0,0,0.07)]">
-      {/* Row 1 — hamburger (mobile) · brand · utility tabs · audit · user pill */}
+      {/* Row 1 — hamburger (mobile) · brand · utility tabs · audit · user pill.
+          Below `lg` this collapses to just hamburger + logo — everything
+          else (utility links, KPI Guide, Audit Trail, Users, clock, user
+          pill/sign-out) relocates into the mobile sidebar drawer instead. */}
       <div className="mx-auto flex h-[50px] items-center gap-2 px-4">
         <button
           type="button"
@@ -100,131 +40,18 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
           </div>
         </div>
 
-        <nav className="ml-auto flex flex-shrink-0 items-center gap-1.5" aria-label="Utility navigation">
-          {UTILITY_NAV_BEFORE_MOM.map((item) => (
-            <NavLink key={item.to} to={item.to} className={utilityLinkClass}>
-              {item.icon && <span className="text-[13px]" aria-hidden>{item.icon}</span>}
-              {item.label}
-            </NavLink>
-          ))}
-          <RoleGate allow={['MD']}>
-            <button
-              type="button"
-              onClick={() => dispatch(openMdBriefing())}
-              title="Open MD Portfolio Briefing"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-[#1E3A5F] bg-[#1E3A5F] px-2.5 py-1.5 text-[11.5px] font-bold text-white transition-colors hover:bg-[#162B47]"
-            >
-              <span aria-hidden>📊</span> MD Portfolio Briefing
-            </button>
-          </RoleGate>
-          {UTILITY_NAV_MOM_ONWARDS.map((item) => (
-            <NavLink key={item.to} to={item.to} className={utilityLinkClass}>
-              {item.icon && <span className="text-[13px]" aria-hidden>{item.icon}</span>}
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+        <UtilityNavCluster
+          onOpenKpiGuide={onOpenKpiGuide}
+          className="ml-auto hidden flex-shrink-0 items-center gap-1.5 lg:flex"
+        />
 
-        <div className="flex flex-shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setKpiOpen(true)}
-            className={cn(
-              'inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-[#374151] transition-colors hover:bg-[#F9FAFB]',
-            )}
-            aria-label="Open KPI reference guide"
-          >
-            <span aria-hidden>❓</span> KPI Guide
-          </button>
-          <RoleGate allow={['MD']}>
-            <NavLink to="/audit" className={utilityLinkClass}>
-              <span aria-hidden>🕒</span> Audit Trail
-            </NavLink>
-          </RoleGate>
-          <RoleGate allow={['MD', 'Admin']}>
-            <NavLink to="/users" className={utilityLinkClass}>
-              <span aria-hidden>👥</span> Users
-            </NavLink>
-          </RoleGate>
-
+        <div className="ml-auto hidden flex-shrink-0 items-center gap-1.5 lg:flex">
           <NavClock />
-
-          <UserPill
-            user={user}
-            divisionName={
-              user?.role === 'PD' && user.divisionId !== undefined
-                ? lookups?.divisions.find((d) => d.divisionId === user.divisionId)?.divisionName
-                    ?? `#${user.divisionId}`
-                : null
-            }
-            loggingOut={loggingOut}
-            onSignOut={onSignOut}
-          />
+          <UserPill />
         </div>
       </div>
 
       {/* Primary navigation lives in the left sidebar (Read.md §1). */}
-
-      <KpiGuideDrawer open={kpiOpen} onClose={() => setKpiOpen(false)} />
     </header>
-  );
-}
-
-/**
- * Header user pill (PD_role.md §2/§3).
- *
- *   All roles → Username · Role
- *   PDs      → Username · Role · Division (matches the JWT's session division;
- *              updates automatically if the divisionId in Redux changes)
- *
- * Kept as a small local component so TopNav's JSX stays legible.
- */
-function UserPill({
-  user, divisionName, loggingOut, onSignOut,
-}: {
-  user: ReturnType<typeof selectCurrentUser> extends infer U ? U : never;
-  divisionName: string | null;
-  loggingOut: boolean;
-  onSignOut: () => Promise<void>;
-}): JSX.Element {
-  const displayName = user?.fullName || user?.username || '—';
-  const roleLabel = user ? (ROLE_DISPLAY[user.role] ?? user.role) : '—';
-  // Full descriptor for the tooltip so truncation doesn't hide data.
-  const fullDescriptor = [displayName, roleLabel, divisionName]
-    .filter(Boolean)
-    .join(' · ');
-  // Compact single-row pill: dot · Name · role/division · sign-out.
-  // Fits within the 50px header without vertical overflow.
-  return (
-    <div
-      className="flex h-8 items-center gap-2 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white pl-2.5 pr-1"
-      title={fullDescriptor}
-    >
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22C55E]" aria-hidden />
-      <div className="flex min-w-0 items-baseline gap-1.5">
-        <span className="max-w-[110px] truncate text-[11.5px] font-bold text-[#111827]">
-          {displayName}
-        </span>
-        <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-          {roleLabel}
-        </span>
-        {divisionName ? (
-          <>
-            <span aria-hidden className="text-[9.5px] leading-none text-[#D1D5DB]">·</span>
-            <span className="max-w-[90px] truncate text-[9.5px] font-semibold uppercase tracking-wider text-[#6D28D9]">
-              {divisionName}
-            </span>
-          </>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        onClick={onSignOut}
-        disabled={loggingOut}
-        className="ml-1 shrink-0 cursor-pointer rounded border border-transparent bg-white px-2 py-1 text-[10.5px] font-medium text-[#6B7280] transition-colors hover:border-[#FCA5A5] hover:bg-[#FEF2F2] hover:text-[#B91C1C] disabled:opacity-60"
-      >
-        {loggingOut ? 'Signing out…' : 'Sign out'}
-      </button>
-    </div>
   );
 }
