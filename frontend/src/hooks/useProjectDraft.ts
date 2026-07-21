@@ -9,6 +9,7 @@ import type {
   ProjectStageV2,
   ProjectStatus,
   ProjectUpsertPayload,
+  TenderSubStage,
   WorkType,
 } from '../types/api';
 
@@ -40,6 +41,12 @@ export interface ProjectDraft {
   /** @deprecated Kept for legacy round-trip only; form no longer edits it. */
   currentPhase: CurrentPhase | null;
   projectStageV2: ProjectStageV2 | null;
+  /**
+   * Server-owned tender workflow sub-stage. Not user-editable via the form —
+   * moved by the Tender Dashboard modal — but round-trips through the draft
+   * so the Input Sheet's stage gate can read the current value.
+   */
+  tenderSubStage: TenderSubStage | null;
   status: ProjectStatus;
   plannedEndDate: string | null;
   revisedEndDate: string | null;
@@ -121,6 +128,7 @@ export const EMPTY_DRAFT: ProjectDraft = {
 
   currentPhase: null,
   projectStageV2: null,
+  tenderSubStage: null,
   status: 'Not Started',
   plannedEndDate: null,
   revisedEndDate: null,

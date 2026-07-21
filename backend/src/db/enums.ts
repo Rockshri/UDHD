@@ -69,6 +69,27 @@ export const projectStageV2Values = [
 ] as const;
 export type ProjectStageV2 = (typeof projectStageV2Values)[number];
 
+/**
+ * Tender workflow sub-stages (Tendor_Dashboard.md §1). Order is significant
+ * — Transfer to Next/Previous Stage walks this array by index and the first
+ * / last entries define the workflow boundaries. The DB CHECK constraint
+ * (drizzle/0009) mirrors these exact strings.
+ */
+export const tenderSubStages = [
+  'NIT Published',
+  'Bid Submission (Open)',
+  'Technical Evaluation',
+  'Financial Evaluation',
+  'Approval Process',
+  'LoA Issued',
+  'Agreement Signing',
+  'Work Order Issued',
+] as const;
+export type TenderSubStage = (typeof tenderSubStages)[number];
+export const FIRST_TENDER_SUB_STAGE = tenderSubStages[0];
+export const FINAL_TENDER_SUB_STAGE =
+  tenderSubStages[tenderSubStages.length - 1] as TenderSubStage;
+
 export const contractTypes = [
   'Work Contract',
   'Service Contract',

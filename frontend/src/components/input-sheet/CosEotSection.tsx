@@ -343,23 +343,34 @@ function CosRowForm({
             value={row.variationPct}
             onChange={(v) => set('variationPct', v)}
           />
-        </div>
-      </BlockPanel>
-
-      <BlockPanel title="EoT Block" accent="#2563EB" tint="#EFF6FF">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <FormField label="EoT Number" value={row.eotNumber} onChange={(v) => set('eotNumber', v)} />
-          <NumberField
-            label="EoT Days Granted"
-            value={row.eotDaysGranted}
-            onChange={(v) => set('eotDaysGranted', v)}
-          />
           <FormField
             label="Time Linked?"
             type="select"
             value={row.timeLinked ? 'Yes' : 'No'}
             onChange={(v) => set('timeLinked', v === 'Yes')}
             options={['No', 'Yes']}
+            hint={
+              row.timeLinked
+                ? 'CoS ↔ EoT are linked — EoT dates on this row feed Section 01 Revised End Date.'
+                : 'CoS independent of EoT — this row will not adjust the project Revised End Date.'
+            }
+          />
+        </div>
+      </BlockPanel>
+
+      <BlockPanel title="EoT Block" accent="#2563EB" tint="#EFF6FF">
+        {!row.timeLinked ? (
+          <p className="mb-2 rounded border border-[#FDE68A] bg-[#FFFBEB] px-2 py-1 text-[11.5px] text-[#92400E]">
+            ⚠ Time Linked is <strong>No</strong> — EoT dates on this row stay independent and do not
+            affect the project schedule. Set Time Linked to <strong>Yes</strong> to link them.
+          </p>
+        ) : null}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <FormField label="EoT Number" value={row.eotNumber} onChange={(v) => set('eotNumber', v)} />
+          <NumberField
+            label="EoT Days Granted"
+            value={row.eotDaysGranted}
+            onChange={(v) => set('eotDaysGranted', v)}
           />
           <FormField
             label="Original End Date"
@@ -392,11 +403,11 @@ function CosRowReadOnly({ item }: { item: CosEotItem }): JSX.Element {
     ['Category', item.category ?? '—'],
     ['CoS Amount', item.cosAmountCr !== null ? `₹ ${item.cosAmountCr.toFixed(2)} Cr` : '—'],
     ['Variation', item.variationPct !== null ? `${item.variationPct.toFixed(2)}%` : '—'],
+    ['Time Linked', item.timeLinked ? 'Yes' : 'No'],
   ];
   const eotRows: Array<[string, string]> = [
     ['EoT Number', item.eotNumber ?? '—'],
     ['EoT Days', String(item.eotDaysGranted ?? 0)],
-    ['Time Linked', item.timeLinked ? 'Yes' : 'No'],
     ['Original End', item.originalEndDate ?? '—'],
     ['New End', item.newEndDate ?? '—'],
     ['Revised', item.revisedDate ?? '—'],

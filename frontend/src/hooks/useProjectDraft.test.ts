@@ -16,6 +16,7 @@ function makeDetail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     pd: 'Kumar',
     projectStage: 'Construction',
     projectStageV2: 'Construction',
+    tenderSubStage: null,
     contractType: 'Work Contract',
     workType: 'Tender Work',
     priority: 'High',

@@ -6,7 +6,7 @@ export interface FormFieldProps {
   value: string | number | null | undefined;
   onChange?: (value: string) => void;
   type?: 'text' | 'number' | 'date' | 'textarea' | 'select';
-  options?: ReadonlyArray<string | { value: string; label: string }>;
+  options?: ReadonlyArray<string | { value: string; label: string; disabled?: boolean }>;
   placeholder?: string;
   rows?: number;
   required?: boolean;
@@ -84,10 +84,16 @@ export function FormField({
         >
           <option value="">— Select —</option>
           {(options ?? []).map((opt) => {
-            const [v, l] = typeof opt === 'string' ? [opt, opt] : [opt.value, opt.label];
+            if (typeof opt === 'string') {
+              return (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              );
+            }
             return (
-              <option key={v} value={v}>
-                {l}
+              <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+                {opt.label}
               </option>
             );
           })}

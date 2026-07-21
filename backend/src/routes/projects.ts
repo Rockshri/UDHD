@@ -16,6 +16,8 @@ import {
   getProject,
   listProjects,
   listProjectsQuery,
+  tenderTransferSchema,
+  transferTenderSubStage,
   updateProject,
 } from '../services/projectsService.js';
 import { cosEotRouter } from './cosEot.js';
@@ -55,6 +57,27 @@ projectsRouter.get('/', async (req, res, next) => {
   try {
     const q = listProjectsQuery.parse(req.query);
     res.json(await listProjects(q, sessionDivisionId(req)));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Tender_Dashboard.md §7 — bulk-transfer selected projects one sub-stage
+ * forward or backward. Guarded by requireProjectUpdate (matches per-project
+ * PATCH). PDs get division-filtered results inside the service. Registered
+ * *before* the `/:projectId` PD guard so this literal path isn't parsed as
+ * a UUID.
+ */
+projectsRouter.post('/tender-transfer', requireProjectUpdate, async (req, res, next) => {
+  try {
+    const body = tenderTransferSchema.parse(req.body);
+    const out = await transferTenderSubStage(
+      body,
+      actorFromReq(req),
+      sessionDivisionId(req),
+    );
+    res.json(out);
   } catch (err) {
     next(err);
   }

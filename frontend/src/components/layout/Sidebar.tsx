@@ -9,6 +9,7 @@ import {
   CloudRain,
   FileEdit,
   FolderTree,
+  Gavel,
   LayoutDashboard,
   Map,
   MapPin,
@@ -59,10 +60,12 @@ interface Props {
   /** Mobile drawer open state (transient). */
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  /** Opens the Tender Dashboard modal (separate group below the primary nav). */
+  onOpenTenderDashboard: () => void;
 }
 
 export function Sidebar({
-  collapsed, onToggleCollapsed, mobileOpen, onCloseMobile,
+  collapsed, onToggleCollapsed, mobileOpen, onCloseMobile, onOpenTenderDashboard,
 }: Props): JSX.Element {
   const currentUser = useAppSelector(selectCurrentUser);
   const role = currentUser?.role;
@@ -162,6 +165,33 @@ export function Sidebar({
               </li>
             ))}
           </ul>
+
+          {/*
+            Tender Dashboard sits in its own group below Pre-Monsoon
+            Preparation (Tender_Dashboard.md §3). It opens a modal instead of
+            navigating, so it's a button rather than a NavLink. The <hr>
+            visually separates it from the primary nav.
+          */}
+          <hr
+            aria-hidden
+            className={cn(
+              'mx-2 my-2 border-t border-[#E5E7EB]',
+              collapsed ? 'lg:mx-1.5' : '',
+            )}
+          />
+          <ul className="flex flex-col gap-0.5 px-2">
+            <li>
+              <SidebarButton
+                label="Tender Dashboard"
+                Icon={Gavel}
+                collapsed={collapsed}
+                onClick={() => {
+                  onCloseMobile();
+                  onOpenTenderDashboard();
+                }}
+              />
+            </li>
+          </ul>
         </nav>
       </aside>
     </>
@@ -175,6 +205,46 @@ interface SidebarLinkProps {
   collapsed: boolean;
   end: boolean;
   onNavigate: () => void;
+}
+
+/**
+ * Same visual grammar as SidebarLink but for actions that open a modal
+ * rather than navigating. No `isActive` state — the modal manages its own
+ * open/closed lifecycle.
+ */
+function SidebarButton({
+  label, Icon, collapsed, onClick,
+}: {
+  label: string;
+  Icon: typeof LayoutDashboard;
+  collapsed: boolean;
+  onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={collapsed ? label : undefined}
+      className={cn(
+        'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[12.5px] font-medium text-[#4B5563] transition-colors hover:bg-[#F3F4F6] hover:text-[#111827]',
+        collapsed && 'lg:justify-center lg:px-1.5',
+      )}
+    >
+      <Icon
+        size={17}
+        className="shrink-0 text-[#6B7280] group-hover:text-[#374151]"
+        aria-hidden
+      />
+      <span
+        className={cn(
+          'truncate transition-opacity',
+          collapsed ? 'lg:hidden' : 'inline',
+        )}
+      >
+        {label}
+      </span>
+    </button>
+  );
 }
 
 function SidebarLink({

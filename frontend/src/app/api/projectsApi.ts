@@ -7,7 +7,18 @@ import type {
   ProjectDetail,
   ProjectListItem,
   ProjectUpsertPayload,
+  TenderSubStage,
 } from '../../types/api';
+
+export interface TenderTransferPayload {
+  projectIds: string[];
+  direction: 'next' | 'prev';
+}
+
+export interface TenderTransferResponse {
+  moved: Array<{ projectId: string; from: TenderSubStage; to: TenderSubStage }>;
+  skipped: Array<{ projectId: string; reason: string }>;
+}
 
 export interface ListProjectsQuery {
   limit?: number;
@@ -93,6 +104,24 @@ export const projectsApi = api.injectEndpoints({
       query: (projectId) => `projects/${projectId}/milestone-history`,
       providesTags: (_res, _err, projectId) => [{ type: 'MilestoneHistory', id: projectId }],
     }),
+
+    /**
+     * Tender_Dashboard.md §7 — bulk-advance/reverse selected projects in
+     * the tender workflow. Response reports both `moved` and `skipped`
+     * so the modal can show partial-success details.
+     */
+    transferTender: build.mutation<TenderTransferResponse, TenderTransferPayload>({
+      query: (body) => ({ url: 'projects/tender-transfer', method: 'POST', body }),
+      invalidatesTags: (res) => {
+        const tags: Array<
+          { type: 'Project'; id: string } | { type: 'ProjectList'; id: 'LIST' } | 'Kpis' | 'Audit'
+        > = [{ type: 'ProjectList', id: 'LIST' }, 'Kpis', 'Audit'];
+        for (const m of res?.moved ?? []) {
+          tags.push({ type: 'Project', id: m.projectId });
+        }
+        return tags;
+      },
+    }),
   }),
   overrideExisting: false,
 });
@@ -106,4 +135,5 @@ export const {
   useDeleteProjectMutation,
   useGetPhysicalHistoryQuery,
   useGetMilestoneHistoryQuery,
+  useTransferTenderMutation,
 } = projectsApi;

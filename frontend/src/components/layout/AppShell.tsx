@@ -7,6 +7,7 @@ import {
   selectShowMdBriefing,
 } from '../../features/auth/authSlice';
 import { MdSchemeSummaryModal } from '../md/MdSchemeSummaryModal';
+import { TenderDashboardModal } from '../tender/TenderDashboardModal';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
 
@@ -30,6 +31,7 @@ export function AppShell(): JSX.Element {
   const showMdBriefing = useAppSelector(selectShowMdBriefing);
   const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed());
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+  const [tenderOpen, setTenderOpen] = useState<boolean>(false);
   const location = useLocation();
 
   // Auto-close the mobile drawer whenever the user navigates. On desktop the
@@ -63,6 +65,7 @@ export function AppShell(): JSX.Element {
             onToggleCollapsed={toggleCollapsed}
             mobileOpen={mobileOpen}
             onCloseMobile={() => setMobileOpen(false)}
+            onOpenTenderDashboard={() => setTenderOpen(true)}
           />
           <main className="min-w-0 flex-1 px-4 py-6">
             <div className="mx-auto max-w-[1400px]">
@@ -74,6 +77,10 @@ export function AppShell(): JSX.Element {
       <MdSchemeSummaryModal
         open={showMdBriefing}
         onClose={() => dispatch(dismissMdBriefing())}
+      />
+      <TenderDashboardModal
+        open={tenderOpen}
+        onClose={() => setTenderOpen(false)}
       />
     </div>
   );

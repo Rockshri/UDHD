@@ -25,6 +25,20 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // `vite preview` (the static server for the production build) needs its
+    // own proxy config — it doesn't inherit from `server`. Match dev port +
+    // API proxy so the CORS whitelist (localhost:5173) stays valid under PM2.
+    preview: {
+      port: 5173,
+      strictPort: true,
+      proxy: {
+        '/api': {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
+    },
     build: {
       outDir: 'dist',
       sourcemap: true,
@@ -34,6 +48,11 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.ts'],
       globals: true,
       css: false,
+      // Vitest owns src/**; Playwright owns e2e/**. Exclude e2e explicitly
+      // so vitest does not try to run *.spec.ts files that import
+      // @playwright/test.
+      include: ['src/**/*.{test,spec}.{ts,tsx}'],
+      exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
       env: {
         // Absolute URL — Node's fetch (used by vitest+jsdom) rejects relative URLs.
         VITE_API_BASE_URL: 'http://localhost:5173/api',

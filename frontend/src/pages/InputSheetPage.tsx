@@ -41,7 +41,7 @@ interface SectionDef {
   label: string;
 }
 
-type SectionGroup = 'fixed' | 'variable';
+type SectionGroup = 'all' | 'fixed' | 'variable';
 
 /**
  * Fixed Inputs — Basic Info + Contract & Security. Only MD/Admin may edit.
@@ -72,6 +72,12 @@ function groupOf(id: SectionId): SectionGroup {
   return FIXED_IDS.has(id) ? 'fixed' : 'variable';
 }
 
+/**
+ * "ALL Fields" is a special group that renders every section stacked on one
+ * page — no sub-tabs. `section` is meaningless when this group is active.
+ */
+const ALL_GROUP: SectionGroup = 'all';
+
 
 export function InputSheetPage(): JSX.Element {
   const { projectId } = useParams<{ projectId: string }>();
@@ -99,17 +105,29 @@ export function InputSheetPage(): JSX.Element {
   const [updateProject, updateState] = useUpdateProjectMutation();
 
   const [section, setSection] = useState<SectionId>('basic');
+  const [groupOverride, setGroupOverride] = useState<SectionGroup | null>(null);
   const [flash, setFlash] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
-  const activeGroup: SectionGroup = groupOf(section);
-  const activeSubTabs = activeGroup === 'fixed' ? FIXED_SECTIONS : VARIABLE_SECTIONS;
+  const activeGroup: SectionGroup = groupOverride ?? groupOf(section);
+  const activeSubTabs =
+    activeGroup === 'fixed'
+      ? FIXED_SECTIONS
+      : activeGroup === 'variable'
+        ? VARIABLE_SECTIONS
+        : [];
 
   /**
-   * Clicking a top-level tab (Fixed / Variable) jumps to that group's first
-   * sub-section. If the user is already inside that group we keep them on
-   * their current sub-tab so a stray click doesn't lose their place.
+   * Clicking a top-level tab jumps to that group's first sub-section (or the
+   * unified view for "ALL Fields"). If the user is already inside that group
+   * we keep them on their current sub-tab so a stray click doesn't lose their
+   * place.
    */
   const openGroup = (g: SectionGroup): void => {
     if (g === activeGroup) return;
+    if (g === ALL_GROUP) {
+      setGroupOverride(ALL_GROUP);
+      return;
+    }
+    setGroupOverride(null);
     setSection((g === 'fixed' ? FIXED_SECTIONS : VARIABLE_SECTIONS)[0]!.id);
   };
 
@@ -272,6 +290,13 @@ export function InputSheetPage(): JSX.Element {
             className="inline-flex rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] p-1 shadow-inner"
           >
             <GroupTab
+              label="ALL Fields"
+              count={FIXED_SECTIONS.length + VARIABLE_SECTIONS.length}
+              active={activeGroup === 'all'}
+              locked={false}
+              onClick={() => openGroup('all')}
+            />
+            <GroupTab
               label="Fixed Inputs"
               count={FIXED_SECTIONS.length}
               active={activeGroup === 'fixed'}
@@ -288,59 +313,62 @@ export function InputSheetPage(): JSX.Element {
             />
           </div>
 
-          <nav
-            role="tablist"
-            aria-label={`${activeGroup === 'fixed' ? 'Fixed' : 'Variable'} input sub-sections`}
-            className="flex flex-wrap gap-0.5 border-b-2 border-[#E5E7EB]"
-          >
-            {activeSubTabs.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                role="tab"
-                aria-selected={section === s.id}
-                onClick={() => setSection(s.id)}
-                className={cn(
-                  '-mb-0.5 inline-flex items-center gap-1 whitespace-nowrap border-b-2 px-3 py-2 text-[11.5px] font-semibold transition-colors',
-                  section === s.id
-                    ? 'border-[#1E3A5F] text-[#1E3A5F]'
-                    : 'border-transparent text-[#6B7280] hover:text-[#374151]',
-                )}
-              >
-                {activeGroup === 'fixed' && !canEditFixed ? (
-                  <span aria-hidden className="text-[10px]">🔒</span>
-                ) : null}
-                {s.label}
-              </button>
-            ))}
-          </nav>
+          {activeGroup !== 'all' ? (
+            <nav
+              role="tablist"
+              aria-label={`${activeGroup === 'fixed' ? 'Fixed' : 'Variable'} input sub-sections`}
+              className="flex flex-wrap gap-0.5 border-b-2 border-[#E5E7EB]"
+            >
+              {activeSubTabs.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={section === s.id}
+                  onClick={() => setSection(s.id)}
+                  className={cn(
+                    '-mb-0.5 inline-flex items-center gap-1 whitespace-nowrap border-b-2 px-3 py-2 text-[11.5px] font-semibold transition-colors',
+                    section === s.id
+                      ? 'border-[#1E3A5F] text-[#1E3A5F]'
+                      : 'border-transparent text-[#6B7280] hover:text-[#374151]',
+                  )}
+                >
+                  {activeGroup === 'fixed' && !canEditFixed ? (
+                    <span aria-hidden className="text-[10px]">🔒</span>
+                  ) : null}
+                  {s.label}
+                </button>
+              ))}
+            </nav>
+          ) : null}
         </div>
 
-        <div>
-          {section === 'basic' ? (
+        <div className={activeGroup === 'all' ? 'space-y-4' : undefined}>
+          {activeGroup === 'all' || section === 'basic' ? (
             <BasicInfoSection draft={draft} setField={setField} readOnly={!canEditFixed} />
           ) : null}
-          {section === 'phase' ? (
+          {activeGroup === 'all' || section === 'contract' ? (
+            <ContractSecuritySection draft={draft} setField={setField} readOnly={!canEditFixed} />
+          ) : null}
+          {activeGroup === 'all' || section === 'phase' ? (
             <PhaseDatesSection
+              projectId={projectId ?? null}
               draft={draft}
               setField={setField}
               cosItems={cosEot.data?.items ?? []}
             />
           ) : null}
-          {section === 'progress' ? (
+          {activeGroup === 'all' || section === 'progress' ? (
             <ProgressFinancialSection
               draft={draft}
               setField={setField}
               cosItems={cosEot.data?.items ?? []}
             />
           ) : null}
-          {section === 'cos' ? (
+          {activeGroup === 'all' || section === 'cos' ? (
             <CosEotSection projectId={projectId ?? null} items={cosEot.data?.items ?? []} />
           ) : null}
-          {section === 'contract' ? (
-            <ContractSecuritySection draft={draft} setField={setField} readOnly={!canEditFixed} />
-          ) : null}
-          {section === 'geo' ? (
+          {activeGroup === 'all' || section === 'geo' ? (
             <GeoTaggingSection
               projectId={projectId ?? null}
               draft={draft}
@@ -348,7 +376,7 @@ export function InputSheetPage(): JSX.Element {
               photos={photos.data?.items ?? []}
             />
           ) : null}
-          {section === 'action' ? (
+          {activeGroup === 'all' || section === 'action' ? (
             <ActionRemarksSection
               projectId={projectId ?? null}
               draft={draft}
@@ -356,8 +384,12 @@ export function InputSheetPage(): JSX.Element {
               actions={mgmt.data?.items ?? []}
             />
           ) : null}
-          {section === 'om' ? <OmDetailsSection draft={draft} setField={setField} /> : null}
-          {section === 'milestones' ? <MilestonesSection projectId={projectId ?? null} /> : null}
+          {activeGroup === 'all' || section === 'om' ? (
+            <OmDetailsSection draft={draft} setField={setField} />
+          ) : null}
+          {activeGroup === 'all' || section === 'milestones' ? (
+            <MilestonesSection projectId={projectId ?? null} />
+          ) : null}
         </div>
 
         <footer className="flex flex-wrap items-center gap-2 border-t border-[#E5E7EB] pt-3">

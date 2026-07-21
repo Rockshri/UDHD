@@ -96,6 +96,13 @@ export const project = pgTable(
     /** Backend column name stays `status`; UI label is "Execution Status" (Phase A §2). */
     status: varchar('status', { length: 20 }).notNull().default('Not Started'),
     projectStageV2: varchar('project_stage_v2', { length: 20 }),
+    /**
+     * Tender Dashboard sub-stage (Tendor_Dashboard.md §1). Non-null iff
+     * project_stage_v2 = 'Tender' — enforced by a CHECK constraint in
+     * drizzle/0009_tender_sub_stage.sql so schema drift can't decouple the
+     * two columns.
+     */
+    tenderSubStage: varchar('tender_sub_stage', { length: 30 }),
     plannedEndDate: date('planned_end_date'),
     revisedEndDate: date('revised_end_date'),
     delayReason: text('delay_reason'),

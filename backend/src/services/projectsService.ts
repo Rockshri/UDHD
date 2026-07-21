@@ -4,6 +4,12 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { auditLog, division, minutesOfMeeting, project, projectScheme } from '../db/schema.js';
 import type { Project } from '../db/schema.js';
+import {
+  FINAL_TENDER_SUB_STAGE,
+  FIRST_TENDER_SUB_STAGE,
+  tenderSubStages,
+  type TenderSubStage,
+} from '../db/enums.js';
 import { vProjectEffectivePhysical } from '../db/views.js';
 import { recordAudit, type AuditActor, type DbExecutor } from '../lib/audit.js';
 import { diffProject } from '../lib/auditLabels.js';
@@ -316,6 +322,10 @@ export async function createProject(
   if (pdDivisionId !== null) {
     (fields as Record<string, unknown>).divisionId = pdDivisionId;
   }
+  // Tender_Dashboard.md §2 + §9 — normalise the sub-stage / stage pairing
+  // before we hit the DB CHECK constraint so the caller gets a useful 4xx
+  // error rather than a raw Postgres integrity violation.
+  reconcileTenderStageOnCreate(fields as Partial<Project>);
 
   await db.transaction(async (tx) => {
     const [inserted] = await tx
@@ -380,6 +390,11 @@ export async function updateProject(
       throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
     }
     const preSchemes = await fetchProjectSchemes(tx, projectId);
+
+    // Tender_Dashboard.md §2 + §9 — normalise the tender sub-stage against
+    // the incoming project stage, then reject illegal Construction/O&M
+    // transitions before writing.
+    reconcileTenderStageOnUpdate(pre, patch);
 
     let updated: Project = pre;
     if (patchKeys.length > 0) {
@@ -493,4 +508,198 @@ export async function assertPdCanAccessProject(
   if (row.divisionId !== pdDivisionId) {
     throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
   }
+}
+
+/* ============================================================
+ * TENDER WORKFLOW (Tendor_Dashboard.md)
+ * ============================================================ */
+
+/**
+ * Normalise sub-stage against stage on create. Runs before the DB insert
+ * so we can raise a friendly 400 instead of a raw CHECK-constraint 500.
+ */
+function reconcileTenderStageOnCreate(fields: Partial<Project>): void {
+  const stage = fields.projectStageV2 ?? null;
+  if (stage === 'Tender') {
+    // Auto-assign the first sub-stage if the client didn't send one.
+    if (!fields.tenderSubStage) {
+      fields.tenderSubStage = FIRST_TENDER_SUB_STAGE;
+    }
+  } else {
+    // Non-Tender stage: sub-stage MUST be null. Silently drop any value
+    // so a stray client payload doesn't crash the insert.
+    fields.tenderSubStage = null;
+  }
+  // Construction/O&M can't be created directly — those stages sit at the
+  // tail of the tender workflow and must be reached via the transfer flow.
+  if (stage === 'Construction' || stage === 'O&M') {
+    throw new HttpError(
+      400,
+      'TENDER_WORKFLOW_REQUIRED',
+      `Cannot create a project directly in ${stage}. Start in Tender, complete the workflow, then advance.`,
+    );
+  }
+}
+
+/**
+ * Normalise sub-stage against stage on update AND enforce Construction/O&M
+ * gating (Tendor_Dashboard.md §9). Existing rows already at those stages
+ * are grandfathered — the gate only fires on transitions into them.
+ */
+function reconcileTenderStageOnUpdate(pre: Project, patch: Partial<Project>): void {
+  const nextStage =
+    'projectStageV2' in patch ? patch.projectStageV2 ?? null : pre.projectStageV2 ?? null;
+
+  // Sub-stage / stage coupling — mirror the DB CHECK constraint at the API
+  // edge so callers get a 400 not a 500.
+  if (nextStage === 'Tender') {
+    // Coming *into* Tender or staying inside it. If the patch doesn't ship
+    // a sub-stage AND the pre-image had none, seed the first one.
+    if (!('tenderSubStage' in patch)) {
+      if (!pre.tenderSubStage) {
+        patch.tenderSubStage = FIRST_TENDER_SUB_STAGE;
+      }
+    } else if (!patch.tenderSubStage) {
+      // Explicit null while staying in Tender is nonsensical.
+      patch.tenderSubStage = FIRST_TENDER_SUB_STAGE;
+    }
+  } else {
+    // Leaving Tender — force sub-stage to null so the coupling holds.
+    patch.tenderSubStage = null;
+  }
+
+  // Construction gating. Only fires when we're actually transitioning INTO
+  // Construction from something else; rows already at Construction retain
+  // their value (grandfathering).
+  if (
+    nextStage === 'Construction' &&
+    pre.projectStageV2 !== 'Construction' &&
+    pre.tenderSubStage !== FINAL_TENDER_SUB_STAGE
+  ) {
+    throw new HttpError(
+      400,
+      'TENDER_WORKFLOW_INCOMPLETE',
+      `Cannot move to Construction — project has not reached ${FINAL_TENDER_SUB_STAGE} in the Tender workflow.`,
+    );
+  }
+
+  // O&M gating: only reachable once Construction was picked AND the
+  // Execution Status is Completed. Same grandfather rule.
+  if (
+    nextStage === 'O&M' &&
+    pre.projectStageV2 !== 'O&M' &&
+    !(pre.projectStageV2 === 'Construction' && pre.status === 'Completed')
+  ) {
+    throw new HttpError(
+      400,
+      'CONSTRUCTION_INCOMPLETE',
+      'Cannot move to O&M — Construction must be Completed first (Execution Status = Completed).',
+    );
+  }
+}
+
+export const tenderTransferSchema = z.object({
+  projectIds: z.array(z.string().uuid()).min(1).max(100),
+  direction: z.enum(['next', 'prev']),
+});
+export type TenderTransferInput = z.infer<typeof tenderTransferSchema>;
+
+export interface TenderTransferResult {
+  moved: Array<{ projectId: string; from: TenderSubStage; to: TenderSubStage }>;
+  skipped: Array<{ projectId: string; reason: string }>;
+}
+
+/**
+ * Bulk-advance / reverse selected projects through the tender sub-stage
+ * workflow (Tendor_Dashboard.md §7). Runs inside a single transaction so
+ * a mid-batch failure rolls back cleanly. Skips (rather than fails) rows
+ * that can't move — the UI surfaces those in the response summary.
+ */
+export async function transferTenderSubStage(
+  input: TenderTransferInput,
+  actor: AuditActor,
+  pdDivisionId: number | null = null,
+): Promise<TenderTransferResult> {
+  const step = input.direction === 'next' ? 1 : -1;
+  const result: TenderTransferResult = { moved: [], skipped: [] };
+
+  await db.transaction(async (tx) => {
+    const rows = await tx
+      .select({
+        projectId: project.projectId,
+        projectName: project.projectName,
+        divisionId: project.divisionId,
+        projectStageV2: project.projectStageV2,
+        tenderSubStage: project.tenderSubStage,
+      })
+      .from(project)
+      .where(inArray(project.projectId, input.projectIds));
+
+    const foundIds = new Set(rows.map((r) => r.projectId));
+    for (const id of input.projectIds) {
+      if (!foundIds.has(id)) {
+        result.skipped.push({ projectId: id, reason: 'Project not found' });
+      }
+    }
+
+    for (const row of rows) {
+      if (pdDivisionId !== null && row.divisionId !== pdDivisionId) {
+        // Don't leak existence to a PD — mask as "not found".
+        result.skipped.push({ projectId: row.projectId, reason: 'Project not found' });
+        continue;
+      }
+      if (row.projectStageV2 !== 'Tender') {
+        result.skipped.push({
+          projectId: row.projectId,
+          reason: `Project is in stage ${row.projectStageV2 ?? '(none)'}; only Tender-stage projects can be transferred.`,
+        });
+        continue;
+      }
+      const current = row.tenderSubStage as TenderSubStage | null;
+      if (!current) {
+        result.skipped.push({ projectId: row.projectId, reason: 'Missing tender sub-stage' });
+        continue;
+      }
+      const idx = tenderSubStages.indexOf(current);
+      if (idx < 0) {
+        result.skipped.push({ projectId: row.projectId, reason: 'Unknown tender sub-stage' });
+        continue;
+      }
+      const nextIdx = idx + step;
+      if (nextIdx < 0 || nextIdx >= tenderSubStages.length) {
+        result.skipped.push({
+          projectId: row.projectId,
+          reason:
+            step > 0
+              ? 'Already at the final tender sub-stage'
+              : 'Already at the first tender sub-stage',
+        });
+        continue;
+      }
+      const to = tenderSubStages[nextIdx] as TenderSubStage;
+      await tx
+        .update(project)
+        .set({ tenderSubStage: to })
+        .where(eq(project.projectId, row.projectId));
+
+      await recordAudit(tx, {
+        actor,
+        action: 'Updated',
+        projectId: row.projectId,
+        projectNameSnapshot: row.projectName,
+        changes: [
+          {
+            fieldKey: 'tenderSubStage',
+            fieldLabel: 'Tender sub-stage',
+            beforeValue: current,
+            afterValue: to,
+          },
+        ],
+      });
+
+      result.moved.push({ projectId: row.projectId, from: current, to });
+    }
+  });
+
+  return result;
 }

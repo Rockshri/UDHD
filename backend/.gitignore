@@ -1,8 +1,48 @@
-node_modules
-dist
-coverage
+# ── Dependencies ────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+.yarn/
+.yarnrc.yml
+
+# ── Build output (Render rebuilds on deploy) ────────────────────────────
+dist/
+build/
+
+# ── Local env (keep .env.example template) ──────────────────────────────
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+!.env.example
+
+# ── TypeScript incremental compile cache ────────────────────────────────
+*.tsbuildinfo
+
+# ── Vitest ──────────────────────────────────────────────────────────────
+coverage/
+.vitest-cache/
+
+# ── ESLint cache ────────────────────────────────────────────────────────
+.eslintcache
+
+# ── Drizzle Kit journals (only created if you run `drizzle-kit generate`;
+#    our workflow is hand-written SQL in ./drizzle so no meta/ appears yet)
+drizzle/meta/
+
+# ── Runtime + logs (includes PM2 process logs) ──────────────────────────
 *.log
-*.md
+.pm2-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ── Perf test artifacts (keep the scripts, ignore results) ──────────────
+perf/results/
+perf/*.json

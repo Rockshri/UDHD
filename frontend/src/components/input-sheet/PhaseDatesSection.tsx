@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { FormField } from './FormField';
 import { FormSectionHeader } from './FormSectionHeader';
+import { isTenderCompleted } from '../../features/tender/tenderWorkflow';
 import type { ProjectDraft } from '../../hooks/useProjectDraft';
 import type { CosEotItem } from '../../types/api';
 import type { ProjectStageV2, ProjectStatus } from '../../types/api';
 
 interface Props {
+  projectId: string | null;
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
   cosItems: CosEotItem[];
@@ -66,22 +68,55 @@ function computeDelay(
   return { total: totalDelay, covered: 0, uncovered: totalDelay, eotGranted: 0 };
 }
 
-export function PhaseDatesSection({ draft, setField, cosItems }: Props): JSX.Element {
+export function PhaseDatesSection({ projectId: _projectId, draft, setField, cosItems }: Props): JSX.Element {
   const isCompleted = draft.status === 'Completed';
-  const hasCoS = cosItems.length > 0;
+  // Tender_Dashboard.md §9 — Construction unlocks only after the project has
+  // been advanced through the Tender workflow to Work Order Issued. O&M
+  // stays gated until Construction has been picked AND marked Completed
+  // (Execution Status). Rows already at Construction/O&M keep the option
+  // available so their existing selection round-trips cleanly.
+  const tenderComplete = isTenderCompleted({
+    projectStageV2: draft.projectStageV2,
+    tenderSubStage: draft.tenderSubStage,
+  });
+  const constructionAllowed = tenderComplete || draft.projectStageV2 === 'Construction';
+  const omAllowed =
+    (constructionAllowed && isCompleted) || draft.projectStageV2 === 'O&M';
+  const stageOptions = PROJECT_STAGES_V2.map((s) => {
+    if (s === 'Construction' && !constructionAllowed) {
+      return { value: s, label: `${s} — locked until Tender complete`, disabled: true };
+    }
+    if (s === 'O&M' && !omAllowed) {
+      return { value: s, label: `${s} — locked until Construction complete`, disabled: true };
+    }
+    return { value: s, label: s };
+  });
+  const stageHint = !constructionAllowed
+    ? 'Construction unlocks after the Tender workflow reaches Work Order Issued.'
+    : !omAllowed
+      ? 'O&M unlocks once Construction is marked Completed (Execution Status).'
+      : undefined;
+  // Only CoS rows flagged Time Linked = YES flow into the project schedule.
+  // Rows with Time Linked = NO are independent bookkeeping and must not
+  // shift Revised End Date or the delay math (Instruction §3).
+  const linkedCosItems = useMemo(
+    () => cosItems.filter((c) => c.timeLinked),
+    [cosItems],
+  );
+  const hasLinkedCoS = linkedCosItems.length > 0;
 
   const latestCosRevised = useMemo(() => {
     let best: string | null = null;
-    for (const c of cosItems) {
+    for (const c of linkedCosItems) {
       const cand = c.revisedDate ?? c.newEndDate;
       if (cand && (best === null || cand > best)) best = cand;
     }
     return best;
-  }, [cosItems]);
+  }, [linkedCosItems]);
 
   const delayInfo = useMemo(
-    () => computeDelay(draft.plannedEndDate, draft.revisedEndDate, latestCosRevised, isCompleted, hasCoS),
-    [draft.plannedEndDate, draft.revisedEndDate, latestCosRevised, isCompleted, hasCoS],
+    () => computeDelay(draft.plannedEndDate, draft.revisedEndDate, latestCosRevised, isCompleted, hasLinkedCoS),
+    [draft.plannedEndDate, draft.revisedEndDate, latestCosRevised, isCompleted, hasLinkedCoS],
   );
 
   return (
@@ -98,8 +133,9 @@ export function PhaseDatesSection({ draft, setField, cosItems }: Props): JSX.Ele
             type="select"
             value={draft.projectStageV2 ?? ''}
             onChange={(v) => setField('projectStageV2', (v as ProjectStageV2) || null)}
-            options={PROJECT_STAGES_V2 as unknown as string[]}
+            options={stageOptions}
             required
+            hint={stageHint ?? ''}
           />
           <FormField
             label="Execution Status"
@@ -130,12 +166,6 @@ export function PhaseDatesSection({ draft, setField, cosItems }: Props): JSX.Ele
             type="date"
             value={draft.expectedCompletionDate}
             onChange={(v) => setField('expectedCompletionDate', v || null)}
-          />
-          <FormField
-            label="Expected Completion (raw text)"
-            value={draft.expectedCompletionRaw}
-            onChange={(v) => setField('expectedCompletionRaw', v || null)}
-            hint="Fallback if the raw source isn't a real date."
           />
           <div className="md:col-span-3">
             <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[#374151]">

@@ -51,6 +51,21 @@ export type ContractType =
   | 'Service Contract'
   | 'O&M Contract'
   | 'Others';
+
+/**
+ * Tender workflow sub-stages (Tendor_Dashboard.md §1). Order matches the
+ * backend's tenderSubStages enum — transfer buttons walk this array by
+ * index, so any drift here would silently corrupt Next/Previous behaviour.
+ */
+export type TenderSubStage =
+  | 'NIT Published'
+  | 'Bid Submission (Open)'
+  | 'Technical Evaluation'
+  | 'Financial Evaluation'
+  | 'Approval Process'
+  | 'LoA Issued'
+  | 'Agreement Signing'
+  | 'Work Order Issued';
 export type Priority = 'High' | 'Medium' | 'Low' | 'N/A';
 export type OmStatusOverride =
   | 'Not Started'
@@ -337,6 +352,8 @@ export interface ProjectListItem {
   /** @deprecated Soft-removed in Phase A; still returned for legacy round-trip. */
   projectStage: ProjectStage | null;
   projectStageV2: ProjectStageV2 | null;
+  /** Tender workflow sub-stage; non-null only when projectStageV2 === 'Tender'. */
+  tenderSubStage: TenderSubStage | null;
   contractType: ContractType | null;
   /** @deprecated Soft-removed in Phase A; still returned for legacy round-trip. */
   workType: WorkType | null;
@@ -422,6 +439,7 @@ export interface ProjectUpsertPayload {
   /** @deprecated Soft-removed in Phase A; forms no longer send it. */
   projectStage?: ProjectStage | null;
   projectStageV2?: ProjectStageV2 | null;
+  tenderSubStage?: TenderSubStage | null;
   contractType?: ContractType | null;
   /** @deprecated Soft-removed in Phase A; forms no longer send it. */
   workType?: WorkType | null;

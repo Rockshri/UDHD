@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { ProjectListItem } from '../../types/api';
 import type { Lookups } from '../../types/api';
 import { formatCurrencyCr, formatDate } from '../../lib/formatters';
@@ -9,6 +8,7 @@ import { OmAlertCell } from './OmAlertCell';
 import { PbgAlertCell } from './PbgAlertCell';
 import { PriorityBadge } from './PriorityBadge';
 import { ProgressBar } from './ProgressBar';
+import { ProjectProfileModal } from './ProjectProfileModal';
 import { StatusBadge } from './StatusBadge';
 
 /** Columns match the reference JSX register (with schema-backed field names). */
@@ -328,7 +328,7 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
   const [showPicker, setShowPicker] = useState(false);
   const [sortKey, setSortKey] = useState<string>('sno');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const navigate = useNavigate();
+  const [profileProjectId, setProfileProjectId] = useState<string | null>(null);
 
   const ctx = useMemo<LookupCtx>(() => {
     const regionById = new Map(
@@ -478,11 +478,11 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
                   key={row.projectId}
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(`/projects/${row.projectId}`)}
+                  onClick={() => setProfileProjectId(row.projectId)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      navigate(`/projects/${row.projectId}`);
+                      setProfileProjectId(row.projectId);
                     }
                   }}
                   className="cursor-pointer border-b border-[#F3F4F6] hover:bg-[#F0F7FF] focus:bg-[#EFF6FF] focus:outline-none"
@@ -508,6 +508,11 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
           </tbody>
         </table>
       </div>
+
+      <ProjectProfileModal
+        projectId={profileProjectId}
+        onClose={() => setProfileProjectId(null)}
+      />
     </div>
   );
 }

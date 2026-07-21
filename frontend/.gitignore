@@ -1,8 +1,55 @@
-node_modules
-dist
-coverage
+# ── Dependencies ────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+.yarn/
+.yarnrc.yml
+
+# ── Build output ────────────────────────────────────────────────────────
+dist/
+dist-ssr/
+build/
+
+# ── Local env (keep the *.example templates) ────────────────────────────
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+!.env.example
+!.env.local.example
+
+# ── TypeScript incremental compile cache ────────────────────────────────
+*.tsbuildinfo
+
+# ── Vite ────────────────────────────────────────────────────────────────
+.vite/
+
+# ── Vitest ──────────────────────────────────────────────────────────────
+coverage/
+.vitest-cache/
+
+# ── Playwright ──────────────────────────────────────────────────────────
+test-results/
+playwright-report/
+/playwright/.cache/
+blob-report/
+
+# ── Vercel (produced by `vercel link` / `vercel dev`) ───────────────────
+.vercel/
+
+# ── ESLint / Prettier caches ────────────────────────────────────────────
+.eslintcache
+.prettiercache
+
+# ── Runtime + logs (includes PM2 process logs) ──────────────────────────
 *.log
-*.md
+.pm2-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+pids/
+*.pid
+*.seed
+*.pid.lock

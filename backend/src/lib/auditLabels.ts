@@ -35,6 +35,7 @@ export const PROJECT_LABELS: Record<string, string> = {
   currentPhase: 'Current phase (legacy)',
   status: 'Execution status',
   projectStageV2: 'Project stage',
+  tenderSubStage: 'Tender sub-stage',
   plannedEndDate: 'Planned end date',
   revisedEndDate: 'Revised end date',
   delayReason: 'Delay reason',

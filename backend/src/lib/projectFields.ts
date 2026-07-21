@@ -19,6 +19,7 @@ import {
   projectStageV2Values,
   projectStages,
   projectStatuses,
+  tenderSubStages,
   workTypes,
 } from '../db/enums.js';
 
@@ -75,6 +76,14 @@ export const createProjectSchema = z.object({
   currentPhase: z.enum(currentPhases).nullable().optional(),
   status: z.enum(projectStatuses).default('Not Started'),
   projectStageV2: z.enum(projectStageV2Values).nullable().optional(),
+  /**
+   * Tender Dashboard sub-stage. Server auto-assigns the first sub-stage
+   * when projectStageV2 flips to 'Tender' and clears it otherwise, so
+   * clients don't need to send this on normal saves. Accepted here so the
+   * bulk-transfer API and any future direct edits can round-trip through
+   * the same shared schema.
+   */
+  tenderSubStage: z.enum(tenderSubStages).nullable().optional(),
   plannedEndDate: dateField(),
   revisedEndDate: dateField(),
   delayReason: textField(),
