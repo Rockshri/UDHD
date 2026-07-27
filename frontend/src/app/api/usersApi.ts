@@ -20,8 +20,17 @@ export const usersApi = api.injectEndpoints({
       query: ({ userId, body }) => ({ url: `users/${userId}`, method: 'PATCH', body }),
       invalidatesTags: ['User'],
     }),
+    deleteUser: build.mutation<void, number>({
+      query: (userId) => ({ url: `users/${userId}`, method: 'DELETE' }),
+      invalidatesTags: ['User'],
+    }),
   }),
   overrideExisting: false,
 });
 
-export const { useListUsersQuery, useCreateUserMutation, useUpdateUserMutation } = usersApi;
+export const {
+  useListUsersQuery,
+  useCreateUserMutation,
+  useUpdateUserMutation,
+  useDeleteUserMutation,
+} = usersApi;

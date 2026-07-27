@@ -6,6 +6,7 @@ import { AuditTrailPage } from './pages/AuditTrailPage';
 import { CosEotPage } from './pages/CosEotPage';
 import { DistrictsPage } from './pages/DistrictsPage';
 import { DivisionsPage } from './pages/DivisionsPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { InputSheetPage } from './pages/InputSheetPage';
 import { LoginPage } from './pages/LoginPage';
 import { MgmtActionsPage } from './pages/MgmtActionsPage';
@@ -26,6 +27,7 @@ export function AppRoutes(): JSX.Element {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
@@ -55,7 +57,7 @@ export function AppRoutes(): JSX.Element {
           <Route path="photos" element={<PlaceholderPage title="Geo Photos" subBatch="deferred" />} />
           <Route path="om" element={<OmPage />} />
 
-          {/* 6.6 — Audit trail is MD-only; user management is MD + Admin (Admin scope is Viewer-only, enforced in-page + backend). */}
+          {/* 6.6 — Audit trail is MD-only; user management is MD + Admin + PD (PD scope is Viewer-only delete, enforced in-page + backend). */}
           <Route
             path="audit"
             element={
@@ -67,7 +69,7 @@ export function AppRoutes(): JSX.Element {
           <Route
             path="users"
             element={
-              <RoleGuardedRoute allow={['MD', 'Admin']}>
+              <RoleGuardedRoute allow={['MD', 'Admin', 'PD']}>
                 <UserManagementPage />
               </RoleGuardedRoute>
             }

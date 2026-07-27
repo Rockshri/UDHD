@@ -1,9 +1,9 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { userRoles } from '../db/enums.js';
+import { userRoles, type UserRole } from '../db/enums.js';
 import type { AppUser } from '../db/schema.js';
-import { appUser, userDivision } from '../db/schema.js';
+import { appUser, auditLog, passwordResetRequest, userDivision } from '../db/schema.js';
 import { recordAudit, type AuditActor, type DbExecutor } from '../lib/audit.js';
 import { diffAppUser } from '../lib/auditLabels.js';
 import { hashPassword } from '../lib/passwords.js';
@@ -14,10 +14,23 @@ import { HttpError } from '../middleware/errorHandler.js';
  *   - MD: full CRUD on any user, any role, any flag.
  *   - Admin: sees + edits Viewer users only, cannot promote them,
  *            can toggle their can_*_projects flags.
+ *   - PD: sees + may delete Viewer users only (no create/edit access).
  *   - Viewer: not allowed here (route middleware rejects).
  *
  * `created_by` is stamped from the actor on create.
  */
+
+/** Deletion hierarchy (Task 2): each role may delete only strictly-lower roles, never its own or a higher one. */
+const DELETABLE_ROLES: Record<UserRole, UserRole[]> = {
+  MD: ['Admin', 'PD', 'Viewer'],
+  Admin: ['PD', 'Viewer'],
+  PD: ['Viewer'],
+  Viewer: [],
+};
+
+/** Forgot-password OTP delivery targets — optional; not every user has them on file. */
+const emailField = z.string().email().max(120).nullable().optional();
+const mobileNumberField = z.string().min(7).max(15).nullable().optional();
 
 export const createUserSchema = z.object({
   username: z.string().min(3).max(60),
@@ -30,6 +43,8 @@ export const createUserSchema = z.object({
   canViewProjects: z.boolean().optional(),
   /** PD assignment — the PD role validates ≥ 1 division at write time. */
   divisions: z.array(z.number().int().positive()).max(50).optional(),
+  email: emailField,
+  mobileNumber: mobileNumberField,
 });
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 
@@ -43,6 +58,8 @@ export const updateUserSchema = z.object({
   canDeleteProjects: z.boolean().optional(),
   canViewProjects: z.boolean().optional(),
   divisions: z.array(z.number().int().positive()).max(50).optional(),
+  email: emailField,
+  mobileNumber: mobileNumberField,
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
@@ -61,6 +78,9 @@ export interface UserOut {
   lastLogin: Date | null;
   /** Assigned division IDs (only meaningful for PDs; empty array otherwise). */
   divisions: number[];
+  /** Forgot-password OTP delivery targets. */
+  email: string | null;
+  mobileNumber: string | null;
 }
 
 function toOut(row: AppUser, divisions: number[]): UserOut {
@@ -78,6 +98,8 @@ function toOut(row: AppUser, divisions: number[]): UserOut {
     createdAt: row.createdAt,
     lastLogin: row.lastLogin,
     divisions,
+    email: row.email,
+    mobileNumber: row.mobileNumber,
   };
 }
 
@@ -123,12 +145,15 @@ async function syncUserDivisions(
   }
 }
 
-/** Actor role decides scope. Admin sees Viewer + PD users. MD sees everyone. */
+/** Actor role decides scope. Admin sees Viewer + PD users. PD sees Viewer users only. MD sees everyone. */
 export async function listUsers(actor: AuditActor): Promise<UserOut[]> {
   const allRows = await db.select().from(appUser).orderBy(appUser.username);
-  const scoped = actor.role === 'Admin'
-    ? allRows.filter((r) => r.role === 'Viewer' || r.role === 'PD')
-    : allRows; // MD sees everyone
+  const scoped =
+    actor.role === 'Admin'
+      ? allRows.filter((r) => r.role === 'Viewer' || r.role === 'PD')
+      : actor.role === 'PD'
+        ? allRows.filter((r) => r.role === 'Viewer')
+        : allRows; // MD sees everyone
   const divisionMap = await fetchDivisionMap(db, scoped.map((r) => r.userId));
   return scoped.map((r) => toOut(r, divisionMap.get(r.userId) ?? []));
 }
@@ -179,6 +204,8 @@ export async function createUser(input: CreateUserInput, actor: AuditActor): Pro
         canDeleteProjects: input.canDeleteProjects ?? defaultFlags,
         canViewProjects:   input.canViewProjects ?? true,
         createdBy: actor.userId,
+        email: input.email ?? null,
+        mobileNumber: input.mobileNumber ?? null,
       })
       .returning();
     if (!row) throw new Error('app_user insert returned no row');
@@ -208,6 +235,8 @@ export async function createUser(input: CreateUserInput, actor: AuditActor): Pro
           canDeleteProjects: row.canDeleteProjects,
           canViewProjects: row.canViewProjects,
           divisions: input.divisions ?? [],
+          email: row.email,
+          mobileNumber: row.mobileNumber,
         },
       ),
     });
@@ -259,6 +288,8 @@ export async function updateUser(
     if (input.canUpdateProjects !== undefined) patch.canUpdateProjects = input.canUpdateProjects;
     if (input.canDeleteProjects !== undefined) patch.canDeleteProjects = input.canDeleteProjects;
     if (input.canViewProjects   !== undefined) patch.canViewProjects   = input.canViewProjects;
+    if (input.email !== undefined) patch.email = input.email;
+    if (input.mobileNumber !== undefined) patch.mobileNumber = input.mobileNumber;
 
     let post = pre;
     if (Object.keys(patch).length > 0) {
@@ -318,5 +349,65 @@ export async function updateUser(
       });
     }
     return toOut(post, postDivisions);
+  });
+}
+
+/**
+ * Deletion hierarchy (Task 2) — a role may only delete strictly-lower
+ * roles (MD→Admin/PD/Viewer, Admin→PD/Viewer, PD→Viewer), never its own
+ * or a higher one. Backend is the real authorization boundary regardless
+ * of what the frontend renders.
+ */
+export async function deleteUser(userId: number, actor: AuditActor): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [pre] = await tx.select().from(appUser).where(eq(appUser.userId, userId)).limit(1);
+    if (!pre) throw new HttpError(404, 'USER_NOT_FOUND', `User ${userId} does not exist`);
+
+    const targetRole = pre.role as UserRole;
+    if (!DELETABLE_ROLES[actor.role].includes(targetRole)) {
+      throw new HttpError(
+        403,
+        'FORBIDDEN_DELETE',
+        `Role ${actor.role} is not permitted to delete ${targetRole} users.`,
+      );
+    }
+
+    await recordAudit(tx, {
+      actor,
+      action: 'Deleted',
+      projectId: null,
+      projectNameSnapshot: null,
+      changes: diffAppUser(
+        {
+          table: 'app_user',
+          userId: pre.userId,
+          username: pre.username,
+          fullName: pre.fullName,
+          role: pre.role,
+          isActive: pre.isActive,
+          canCreateProjects: pre.canCreateProjects,
+          canUpdateProjects: pre.canUpdateProjects,
+          canDeleteProjects: pre.canDeleteProjects,
+          canViewProjects: pre.canViewProjects,
+          email: pre.email,
+          mobileNumber: pre.mobileNumber,
+        },
+        {},
+      ),
+    });
+
+    // audit_log.user_id and password_reset_request.approver_id reference
+    // app_user without a cascade (their *_label/*_role text columns are
+    // durable snapshots designed to outlive the row) — null them out so
+    // the delete below doesn't hit a foreign-key violation. Every other
+    // referencing table (refresh_token, user_division, password_reset_otp,
+    // password_reset_request.user_id) already cascades.
+    await tx.update(auditLog).set({ userId: null }).where(eq(auditLog.userId, userId));
+    await tx
+      .update(passwordResetRequest)
+      .set({ approverId: null })
+      .where(eq(passwordResetRequest.approverId, userId));
+
+    await tx.delete(appUser).where(eq(appUser.userId, userId));
   });
 }

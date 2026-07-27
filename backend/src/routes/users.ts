@@ -1,28 +1,30 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { actorFromReq } from '../lib/actor.js';
-import { requireAuth, requireWriter } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireWriter } from '../middleware/auth.js';
 import * as service from '../services/usersService.js';
 
 /**
  * User management endpoints.
  *
- * Access model (Phase 6.6):
- *   - MD: full CRUD, any role, any flag combination.
- *   - Admin: sees + edits Viewer users only (enforced inside the service).
- *   - Viewer: 403.
+ * Access model (Phase 6.6 + Task 2 deletion hierarchy):
+ *   - MD: full CRUD, any role, any flag combination; may delete Admin/PD/Viewer.
+ *   - Admin: sees + edits Viewer users only (enforced inside the service); may delete PD/Viewer.
+ *   - PD: list-only visibility of Viewer users (enforced inside the service); may delete Viewer only.
+ *   - Viewer: 403 everywhere.
  *
- * Route-level guard is `requireWriter` (Admin+MD); role-specific scoping
- * (e.g. Admin can only touch Viewers) lives in the service so the audit
- * layer sees the correct actor context.
+ * List/delete allow PD in addition to `requireWriter` (Admin+MD); create/
+ * update stay Admin+MD only. Role-specific scoping (e.g. Admin can only
+ * touch Viewers, PD can only delete Viewers) lives in the service so the
+ * audit layer sees the correct actor context.
  */
 export const usersRouter = Router();
 
-usersRouter.use(requireAuth, requireWriter);
+usersRouter.use(requireAuth);
 
 const idParam = z.object({ userId: z.coerce.number().int().positive() });
 
-usersRouter.get('/', async (req, res, next) => {
+usersRouter.get('/', requireRole('MD', 'Admin', 'PD'), async (req, res, next) => {
   try {
     res.json({ items: await service.listUsers(actorFromReq(req)) });
   } catch (err) {
@@ -30,7 +32,7 @@ usersRouter.get('/', async (req, res, next) => {
   }
 });
 
-usersRouter.post('/', async (req, res, next) => {
+usersRouter.post('/', requireWriter, async (req, res, next) => {
   try {
     const body = service.createUserSchema.parse(req.body);
     const out = await service.createUser(body, actorFromReq(req));
@@ -40,12 +42,22 @@ usersRouter.post('/', async (req, res, next) => {
   }
 });
 
-usersRouter.patch('/:userId', async (req, res, next) => {
+usersRouter.patch('/:userId', requireWriter, async (req, res, next) => {
   try {
     const { userId } = idParam.parse(req.params);
     const body = service.updateUserSchema.parse(req.body);
     const out = await service.updateUser(userId, body, actorFromReq(req));
     res.json(out);
+  } catch (err) {
+    next(err);
+  }
+});
+
+usersRouter.delete('/:userId', requireRole('MD', 'Admin', 'PD'), async (req, res, next) => {
+  try {
+    const { userId } = idParam.parse(req.params);
+    await service.deleteUser(userId, actorFromReq(req));
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useLoginMutation } from '../app/api/authApi';
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated } from '../features/auth/authSlice';
 import buidcoPic from '../assets/BUIDCo_pic.jpg';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { inputClassName, primaryButtonClassName, secondaryButtonClassName } from './authFormStyles';
 
 interface LocationState {
   from?: { pathname: string };
@@ -15,19 +16,6 @@ interface PdDivision {
   divisionId: number;
   divisionName: string;
 }
-
-/** Shared classNames for the redesigned inputs/buttons — kept local to this
- *  page so the shared ui/input.tsx and ui/button.tsx (used everywhere else
- *  in the app) stay untouched. Purely presentational; no behavior here. */
-const inputClassName =
-  'h-11 rounded-xl border-[#D1D5DB] px-4 text-sm transition-all duration-200 ' +
-  'focus-visible:border-[#1D4ED8] focus-visible:ring-4 focus-visible:ring-[#1D4ED8]/15 focus-visible:ring-offset-0';
-const primaryButtonClassName =
-  'h-12 rounded-xl bg-gradient-to-r from-[#1E3A5F] to-[#1D4ED8] text-[15px] font-semibold ' +
-  'shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:from-[#17304d] hover:to-[#1741b0] hover:shadow-lg ' +
-  'active:translate-y-0';
-const secondaryButtonClassName =
-  'h-12 rounded-xl border-[#D1D5DB] text-[15px] font-semibold transition-all duration-200 hover:-translate-y-0.5';
 
 export function LoginPage(): JSX.Element {
   const [username, setUsername] = useState('');
@@ -186,7 +174,6 @@ export function LoginPage(): JSX.Element {
                       required
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="e.g. shri"
                       className={inputClassName}
                     />
                   </label>
@@ -216,6 +203,12 @@ export function LoginPage(): JSX.Element {
                   >
                     {isLoading ? 'Signing in…' : 'Sign in'}
                   </Button>
+                  <Link
+                    to="/forgot-password"
+                    className="block text-center text-[12.5px] font-semibold text-[#1D4ED8] hover:underline"
+                  >
+                    Forgot Password?
+                  </Link>
                 </>
               )}
             </form>

@@ -1,10 +1,20 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { z } from 'zod';
 import { REFRESH_COOKIE_NAME, refreshCookieOptions } from '../lib/cookies.js';
-import { loginLimiter, refreshLimiter } from '../lib/rateLimit.js';
+import {
+  loginLimiter,
+  otpSendCooldownLimiter,
+  otpSendLimiter,
+  otpVerifyLimiter,
+  passwordResetLookupLimiter,
+  passwordResetRequestLimiter,
+  refreshLimiter,
+} from '../lib/rateLimit.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as authService from '../services/authService.js';
+import * as passwordResetRequestService from '../services/passwordResetRequestService.js';
+import * as passwordResetService from '../services/passwordResetService.js';
 
 export const authRouter = Router();
 
@@ -146,3 +156,130 @@ authRouter.get('/me', requireAuth, (req, res) => {
   }
   res.json({ user });
 });
+
+/* ============================================================
+ * FORGOT PASSWORD (OTP)
+ *
+ * All four endpoints are public (no requireAuth — a locked-out user by
+ * definition can't authenticate yet), rate-limited by username so one
+ * account's abuse budget doesn't affect others, and never reveal whether
+ * a username exists via response shape (Task 10).
+ * ============================================================ */
+
+const usernameSchema = z.object({ username: z.string().min(1).max(60) });
+const channelSchema = z.enum(['email', 'mobile']);
+
+function usernameKey(req: Request): string {
+  const body = req.body as { username?: unknown } | undefined;
+  if (body && typeof body.username === 'string') {
+    const u = body.username.trim().toLowerCase();
+    if (u.length > 0) return `user:${u}`;
+  }
+  return ipKey(req);
+}
+
+function usernameChannelKey(req: Request): string {
+  const body = req.body as { username?: unknown; channel?: unknown } | undefined;
+  if (body && typeof body.username === 'string' && typeof body.channel === 'string') {
+    const u = body.username.trim().toLowerCase();
+    if (u.length > 0) return `user:${u}:${body.channel}`;
+  }
+  return ipKey(req);
+}
+
+authRouter.post(
+  '/request-password-reset',
+  rateLimit(passwordResetLookupLimiter, ipKey),
+  async (req, res, next) => {
+    try {
+      const { username } = usernameSchema.parse(req.body);
+      const result = await passwordResetService.requestPasswordReset(username);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const sendOtpSchema = z.object({ username: z.string().min(1).max(60), channel: channelSchema });
+
+authRouter.post(
+  '/send-otp',
+  rateLimit(otpSendCooldownLimiter, usernameChannelKey),
+  rateLimit(otpSendLimiter, usernameKey),
+  async (req, res, next) => {
+    try {
+      const { username, channel } = sendOtpSchema.parse(req.body);
+      await passwordResetService.sendOtp(username, channel, req);
+      res.json({ sent: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const verifyOtpSchema = z.object({
+  username: z.string().min(1).max(60),
+  channel: channelSchema,
+  otp: z.string().length(6),
+});
+
+authRouter.post(
+  '/verify-otp',
+  rateLimit(otpVerifyLimiter, usernameKey),
+  async (req, res, next) => {
+    try {
+      const { username, channel, otp } = verifyOtpSchema.parse(req.body);
+      const result = await passwordResetService.verifyOtp(username, channel, otp);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const resetPasswordSchema = z
+  .object({
+    resetToken: z.string().min(1),
+    password: z.string().min(8).max(200),
+    confirmPassword: z.string().min(8).max(200),
+  });
+
+authRouter.post(
+  '/reset-password',
+  rateLimit(passwordResetLookupLimiter, ipKey),
+  async (req, res, next) => {
+    try {
+      const { resetToken, password, confirmPassword } = resetPasswordSchema.parse(req.body);
+      await passwordResetService.resetPassword(resetToken, password, confirmPassword);
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * Submitted pre-login by a locked-out Admin/PD/Viewer (MD self-serves via
+ * send-otp directly and never hits this). There is no separate approval
+ * action anywhere: if an eligible approver has contact info on file, the
+ * request resolves immediately and this same call fires the OTP straight
+ * to them (reusing sendOtp) — the code itself, relayed by the approver
+ * out of band, is the approval.
+ */
+authRouter.post(
+  '/password-reset-requests',
+  rateLimit(passwordResetRequestLimiter, usernameKey),
+  async (req, res, next) => {
+    try {
+      const { username, channel } = sendOtpSchema.parse(req.body);
+      const { otpSent } = await passwordResetRequestService.createRequest(username, channel, req);
+      if (otpSent) {
+        await passwordResetService.sendOtp(username, channel, req);
+      }
+      res.status(201).json({ submitted: true, otpSent });
+    } catch (err) {
+      next(err);
+    }
+  },
+);

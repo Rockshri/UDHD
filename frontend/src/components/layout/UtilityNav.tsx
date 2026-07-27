@@ -78,7 +78,7 @@ export function UtilityNavCluster({
           <span aria-hidden>🕒</span> Audit Trail
         </NavLink>
       </RoleGate>
-      <RoleGate allow={['MD', 'Admin']}>
+      <RoleGate allow={['MD', 'Admin', 'PD']}>
         <NavLink to="/users" className={utilityLinkClass} onClick={onNavigate}>
           <span aria-hidden>👥</span> Users
         </NavLink>

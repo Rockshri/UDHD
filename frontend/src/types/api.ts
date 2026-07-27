@@ -114,6 +114,60 @@ export interface MeResponse {
   user: UserPublic;
 }
 
+/* -------- Forgot password (OTP) -------- */
+
+export type OtpChannel = 'email' | 'mobile';
+
+export interface RequestPasswordResetPayload {
+  username: string;
+}
+
+export interface RequestPasswordResetResponse {
+  found: boolean;
+  /** Only MD self-serves directly; every other role goes through request/approval. */
+  selfService: boolean;
+  maskedEmail: string | null;
+  maskedMobile: string | null;
+  /** Present only when found && !selfService. */
+  requestStatus?: 'none' | 'pending' | 'approved';
+  /** Present only when requestStatus === 'approved' — the channel fixed at request time. */
+  channel?: OtpChannel;
+  /** Present only when found && !selfService — e.g. "MD, Admin, or PD". */
+  approverRolesLabel?: string;
+}
+
+export interface CreatePasswordResetRequestPayload {
+  username: string;
+  channel: OtpChannel;
+}
+
+export interface CreatePasswordResetRequestResponse {
+  submitted: true;
+  /** True once an eligible approver was found and the OTP was actually dispatched to them. */
+  otpSent: boolean;
+}
+
+export interface SendOtpPayload {
+  username: string;
+  channel: OtpChannel;
+}
+
+export interface VerifyOtpPayload {
+  username: string;
+  channel: OtpChannel;
+  otp: string;
+}
+
+export interface VerifyOtpResponse {
+  resetToken: string;
+}
+
+export interface ResetPasswordPayload {
+  resetToken: string;
+  password: string;
+  confirmPassword: string;
+}
+
 /* -------- Lookups -------- */
 
 export interface Lookups {
@@ -687,6 +741,9 @@ export interface UserRow {
   createdBy: number | null;
   createdAt: string | null;
   lastLogin: string | null;
+  /** Forgot-password OTP delivery targets. */
+  email: string | null;
+  mobileNumber: string | null;
 }
 
 export interface CreateUserPayload {
@@ -699,6 +756,8 @@ export interface CreateUserPayload {
   canDeleteProjects?: boolean;
   canViewProjects?: boolean;
   divisions?: number[];
+  email?: string | null;
+  mobileNumber?: string | null;
 }
 
 export interface UpdateUserPayload {
@@ -711,6 +770,8 @@ export interface UpdateUserPayload {
   canDeleteProjects?: boolean;
   canViewProjects?: boolean;
   divisions?: number[];
+  email?: string | null;
+  mobileNumber?: string | null;
 }
 
 export interface AuditChange {
