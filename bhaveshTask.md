@@ -1,28 +1,30 @@
-Task 1: Add Back Navigation to the Forgot Password Flow
-In the Forgot Password workflow, after the user proceeds to the OTP Verification page (where the verification code is entered), provide a Back option.
-The Back action should navigate the user to the previous step where they entered their Username / Employee ID.
-Preserve any previously entered username so the user does not need to re-enter it.
-Ensure the back navigation does not interrupt or reset the forgot password flow unless explicitly required.
-Do not affect the existing authentication, OTP generation, verification process, or any other functionality.
-Task 2: Implement Role-Based User Deletion
-Implement role-based user deletion according to the existing RBAC hierarchy.
-In the Users module, after logging into the dashboard, navigate to the user listing.
-Under the Action column, clicking Edit should display a Delete button.
-The Delete button must only be visible and functional for users who have permission to delete based on the role hierarchy.
-Enforce the following deletion permissions:
-MD can delete Admin, PD, and Viewer users.
-Admin can delete PD and Viewer users.
-PD can delete Viewer users.
-Users must not be able to delete users of the same role or any higher role.
-Enforce the same permission checks on both the frontend and backend to prevent unauthorized deletion.
-Display an appropriate confirmation dialog before deleting a user.
-After successful deletion, refresh the user list and display a success notification.
-Display an appropriate error message if the user does not have permission to perform the deletion.
-Development Constraints
-Analyze the existing authentication, forgot password flow, RBAC implementation, and user management module before making any changes.
-Preserve the existing architecture, UI design, routing, authentication, authorization, APIs, and all current functionality.
-Make only the minimum necessary changes required to implement these features.
-Reuse existing components, services, middleware, and role-based authorization wherever possible.
-Do not rename files, functions, variables, routes, database models, or modify unrelated code.
-Ensure all existing features continue to work without regression.
-Do not hallucinate or assume implementation details. If any requirement is unclear or any existing logic conflicts with these changes, analyze the codebase and ask for clarification before proceeding.
+Tasks
+
+Analyze the existing Download/Export implementation in both:
+
+MD Portfolio Briefing
+Projects page (Sidebar)
+
+Understand the current dropdown behavior and export implementation before making any changes.
+
+Improve the Download/Export dropdown to provide a more user-friendly experience across both modules.
+Update the dropdown behavior so that:
+Clicking the Download/Export button opens the dropdown.
+Clicking anywhere outside the dropdown automatically closes it.
+The dropdown closes automatically when an export option is selected.
+The current requirement of clicking the same button again to close the dropdown is removed.
+Apply the improved dropdown behavior consistently in:
+MD Portfolio Briefing
+Projects page (Sidebar)
+Do not modify the existing PDF, Excel, or PowerPoint export formats in the Projects page (Sidebar). The enhancement in the Projects page should be limited to improving the Download/Export dropdown behavior only. The content, layout, formatting, and structure of all exported files must remain exactly as they are currently implemented.
+In the MD Portfolio Briefing, update the PDF export layout so that the project details are displayed in the same block/card-based format as shown on the dashboard.
+In the MD Portfolio Briefing, update the PowerPoint (PPT) export to follow the same block/card-based layout as the dashboard, maintaining consistency with the PDF export.
+Ensure that both the PDF and PowerPoint (PPT) exports in the MD Portfolio Briefing accurately reflect the currently selected project and include only the currently selected (ticked) fields from the Fields filter.
+Maintain a clean, professional, and readable layout in both export formats, using additional pages or slides where necessary to accommodate all project details without truncation or data loss.
+Perform comprehensive testing to verify that:
+The dropdown behaves correctly in all supported scenarios.
+Clicking outside the dropdown closes it as expected.
+PDF and PowerPoint exports in the MD Portfolio Briefing are generated successfully using the updated block/card-based layout.
+The Projects page export formats (PDF, Excel, and PowerPoint) remain unchanged.
+Existing filtering, field selection, export functionality, navigation, UI behavior, APIs, business logic, database operations, performance, and user workflows continue to function correctly.
+No existing functionality, business logic, UI behavior, application flow, or any other feature is affected or changed by this implementation.

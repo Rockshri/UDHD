@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useGetLookupsQuery } from '../app/api/lookupsApi';
-import { useListProjectsQuery, type ListProjectsQuery } from '../app/api/projectsApi';
+import {
+  useLazyListProjectsQuery,
+  useListProjectsQuery,
+  type ListProjectsQuery,
+} from '../app/api/projectsApi';
 import { ProjectsFilterBar } from '../components/projects/ProjectsFilterBar';
 import { ProjectsTable } from '../components/projects/ProjectsTable';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { useProjectFilters } from '../hooks/useProjectFilters';
+import type { ProjectListItem } from '../types/api';
 
 const PAGE_SIZE = 50;
+/** Backend caps `limit` at 100 (Zod schema in projectsService.ts) — used when paging through everything for export. */
+const EXPORT_PAGE_SIZE = 100;
 
 function buildQuery(f: ReturnType<typeof useProjectFilters>['filters'], cursor?: string): ListProjectsQuery {
   const q: ListProjectsQuery = { limit: PAGE_SIZE };
@@ -32,12 +39,30 @@ export function ProjectsPage(): JSX.Element {
   // we apply it client-side over the current page.
   const query = useListProjectsQuery(buildQuery(filters, cursor));
   const lookups = useGetLookupsQuery();
+  const [triggerListProjects] = useLazyListProjectsQuery();
 
   const rawItems = query.data?.items ?? [];
   const filteredItems = rawItems.filter((r) => {
     if (filters.priority && r.priority !== filters.priority) return false;
     return true;
   });
+
+  // Export needs every project matching the current filters, not just the
+  // current 50-row page — loop through cursors at the backend's max page size.
+  const fetchAllProjects = useCallback(async (): Promise<ProjectListItem[]> => {
+    const all: ProjectListItem[] = [];
+    let nextCursor: string | undefined;
+    for (;;) {
+      const page = await triggerListProjects({
+        ...buildQuery(filters, nextCursor),
+        limit: EXPORT_PAGE_SIZE,
+      }).unwrap();
+      all.push(...page.items);
+      if (!page.nextCursor) break;
+      nextCursor = page.nextCursor;
+    }
+    return all.filter((r) => !filters.priority || r.priority === filters.priority);
+  }, [filters, triggerListProjects]);
 
   return (
     <div className="space-y-4">
@@ -91,6 +116,7 @@ export function ProjectsPage(): JSX.Element {
             rows={filteredItems}
             lookups={lookups.data}
             isFetching={query.isFetching}
+            fetchAllRows={fetchAllProjects}
           />
           <div className="flex items-center justify-between text-xs text-[#6B7280]">
             <span>
