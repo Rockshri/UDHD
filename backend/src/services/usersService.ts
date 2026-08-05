@@ -215,6 +215,78 @@ export async function createUser(input: CreateUserInput, actor: AuditActor): Pro
   });
 }
 
+/**
+ * Delete a user account.
+ *
+ *  - MD    → may delete any role except themselves.
+ *  - Admin → may delete Viewer or PD only. Cannot delete MD/Admin or self.
+ *  - PD/Viewer → not allowed here (route middleware rejects).
+ *
+ * Related `user_division` rows are cleared inside the transaction because the
+ * FK doesn't cascade. Audit trail records who deleted whom (username + role
+ * captured so history remains readable after the row is gone).
+ */
+export async function deleteUser(
+  userId: number,
+  actor: AuditActor,
+): Promise<{ userId: number }> {
+  return db.transaction(async (tx) => {
+    const [pre] = await tx.select().from(appUser).where(eq(appUser.userId, userId)).limit(1);
+    if (!pre) throw new HttpError(404, 'USER_NOT_FOUND', `User ${userId} does not exist`);
+
+    if (actor.userId === userId) {
+      throw new HttpError(400, 'CANNOT_DELETE_SELF', "You can't delete your own account.");
+    }
+
+    // Role-based gating: Admin can only remove Viewer/PD; anyone else than
+    // MD is refused. MD may remove anyone but themselves (guarded above).
+    if (actor.role === 'Admin') {
+      if (pre.role !== 'Viewer' && pre.role !== 'PD') {
+        throw new HttpError(
+          403,
+          'ADMIN_CANNOT_DELETE_HIGHER',
+          'Admin accounts can only delete Viewer or PD users.',
+        );
+      }
+    } else if (actor.role !== 'MD') {
+      throw new HttpError(403, 'FORBIDDEN', 'Only MD or Admin can delete users');
+    }
+
+    // FK from user_division → app_user is not ON DELETE CASCADE, so wipe
+    // assignment rows first. Any other tables that carry a nullable
+    // created_by / updated_by FK to app_user simply retain the historical
+    // id (row is preserved even if the user is gone).
+    await tx.delete(userDivision).where(eq(userDivision.userId, userId));
+    const result = await tx.delete(appUser).where(eq(appUser.userId, userId));
+    // Some drivers return { rowCount }, others don't — treat 0 rows as a
+    // race-condition NOT_FOUND rather than silently swallowing it.
+    const rowCount = (result as unknown as { rowCount?: number }).rowCount;
+    if (rowCount === 0) {
+      throw new HttpError(404, 'USER_NOT_FOUND', `User ${userId} does not exist`);
+    }
+
+    await recordAudit(tx, {
+      actor,
+      action: 'Deleted',
+      projectId: null,
+      projectNameSnapshot: null,
+      changes: diffAppUser(
+        {
+          table: 'app_user',
+          userId: pre.userId,
+          username: pre.username,
+          fullName: pre.fullName,
+          role: pre.role,
+          isActive: pre.isActive,
+        },
+        {},
+      ),
+    });
+
+    return { userId: pre.userId };
+  });
+}
+
 export async function updateUser(
   userId: number,
   input: UpdateUserInput,

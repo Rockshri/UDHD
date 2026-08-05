@@ -26,8 +26,8 @@ export function DistrictSummaryCard(): JSX.Element {
         ) : rows.length === 0 ? (
           <EmptyDistricts />
         ) : (
-          <div className="overflow-hidden rounded border border-[#E5E7EB]">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded border border-[#E5E7EB]">
+            <table className="w-full min-w-[420px] text-sm">
               <thead className="bg-[#F9FAFB] text-[10.5px] uppercase tracking-wider text-[#6B7280]">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold">District</th>

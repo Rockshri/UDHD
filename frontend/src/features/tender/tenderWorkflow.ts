@@ -56,3 +56,20 @@ export function isTenderCompleted(project: {
     project.tenderSubStage === FINAL_TENDER_SUB_STAGE
   );
 }
+
+/** Placeholder strings used when NIT details haven't been entered yet. */
+export const NIT_NUMBER_PLACEHOLDER = 'Yet to be Published';
+export const NIT_DATE_PLACEHOLDER = 'Yet to Declare';
+
+/**
+ * Render helper — returns the actual NIT Number or the placeholder text.
+ * Used across the Projects Register, Tender Dashboard, and ProfileModal so
+ * the "before publication" wording is defined in a single place.
+ */
+export function displayNitNumber(nitNumber: string | null): string {
+  return nitNumber && nitNumber.trim() !== '' ? nitNumber : NIT_NUMBER_PLACEHOLDER;
+}
+
+export function displayNitDate(nitDate: string | null): string {
+  return nitDate ? nitDate : NIT_DATE_PLACEHOLDER;
+}

@@ -12,6 +12,8 @@ interface Props {
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
   cosItems: CosEotItem[];
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
 /** New Project Stage dropdown (Phase A §3.2) — replaces the removed Current Phase. */
@@ -68,7 +70,7 @@ function computeDelay(
   return { total: totalDelay, covered: 0, uncovered: totalDelay, eotGranted: 0 };
 }
 
-export function PhaseDatesSection({ projectId: _projectId, draft, setField, cosItems }: Props): JSX.Element {
+export function PhaseDatesSection({ projectId: _projectId, draft, setField, cosItems, num = '01' }: Props): JSX.Element {
   const isCompleted = draft.status === 'Completed';
   // Tender_Dashboard.md §9 — Construction unlocks only after the project has
   // been advanced through the Tender workflow to Work Order Issued. O&M
@@ -123,7 +125,7 @@ export function PhaseDatesSection({ projectId: _projectId, draft, setField, cosI
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="01"
+          num={num}
           title="Phase, Status & Dates"
           sub="Revised End Date auto-fills from the latest CoS if left blank"
         />

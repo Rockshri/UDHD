@@ -12,9 +12,11 @@ interface Props {
    * context but can't mutate any of them.
    */
   readOnly?: boolean;
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
-export function ContractSecuritySection({ draft, setField, readOnly = false }: Props): JSX.Element {
+export function ContractSecuritySection({ draft, setField, readOnly = false, num = '02' }: Props): JSX.Element {
   const contractValue = draft.contractValueCr ?? 0;
   const paidToDate = draft.totalPaymentsCr ?? 0;
   const balance = contractValue - paidToDate;
@@ -23,7 +25,7 @@ export function ContractSecuritySection({ draft, setField, readOnly = false }: P
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="02"
+          num={num}
           title="Contract & Financial Security"
           sub="Agreement, PBG, EMD, payments & retention (all in ₹ Cr)"
         />

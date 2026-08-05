@@ -4,11 +4,14 @@ import {
   useGetProjectQuery,
   useListProjectsQuery,
   useTransferTenderMutation,
+  useUpdateProjectNitMutation,
 } from '../../app/api/projectsApi';
 import { useAppSelector } from '../../app/hooks';
 import { selectCurrentUser } from '../../features/auth/authSlice';
 import {
   bucketByTenderSubStage,
+  displayNitDate,
+  displayNitNumber,
   FINAL_TENDER_SUB_STAGE,
   FIRST_TENDER_SUB_STAGE,
   TENDER_SUB_STAGES,
@@ -119,6 +122,25 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
 
   const runTransfer = async (direction: 'next' | 'prev'): Promise<void> => {
     if (!canTransfer || selectedIds.size === 0) return;
+    // NIT_addition_instructions.md §2 — pre-flight validation: moving forward
+    // out of NIT Published requires every selected project to have both
+    // NIT Number AND NIT Date. Backend re-checks; this saves a round trip
+    // and gives the user the exact spec-worded message.
+    if (direction === 'next' && stagesActive === 'NIT Published') {
+      const missing = tenderProjects
+        .filter((p) => selectedIds.has(p.projectId))
+        .filter((p) => !p.nitNumber || !p.nitDate);
+      if (missing.length > 0) {
+        setFlash({
+          text:
+            missing.length === 1
+              ? `Please enter both NIT Number and NIT Date before transferring "${missing[0]!.projectName}" to the next Tender stage.`
+              : `Please enter both NIT Number and NIT Date on ${missing.length} selected project${missing.length === 1 ? '' : 's'} before transferring to the next Tender stage.`,
+          kind: 'err',
+        });
+        return;
+      }
+    }
     try {
       const result = await transferTender({
         projectIds: [...selectedIds],
@@ -166,7 +188,7 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
         style={{ width: '95vw' }}
       >
         <header
-          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-t-xl px-5 py-3.5"
+          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-t-xl px-3 py-3 sm:px-5 sm:py-3.5"
           style={{ background: 'linear-gradient(100deg,#1E3A5F 0%,#2563EB 100%)' }}
         >
           <div className="min-w-0">
@@ -194,7 +216,7 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
         <nav
           role="tablist"
           aria-label="Tender Dashboard tabs"
-          className="flex flex-wrap gap-0.5 border-b-2 border-[#E5E7EB] px-4 pt-2"
+          className="flex flex-wrap gap-0.5 border-b-2 border-[#E5E7EB] px-2 pt-2 sm:px-4"
         >
           {TABS.map((t) => (
             <button
@@ -215,7 +237,7 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
           ))}
         </nav>
 
-        <div className="max-h-[calc(100vh-160px)] overflow-y-auto px-5 py-5">
+        <div className="max-h-[calc(100vh-160px)] overflow-y-auto px-3 py-4 sm:px-5 sm:py-5">
           {flash ? (
             <div
               className={cn(
@@ -342,7 +364,7 @@ function DashboardTab({
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] border-collapse text-[12px]">
+              <table className="w-full min-w-[960px] border-collapse text-[12px]">
                 <thead>
                   <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
                     <th className="px-3 py-2 text-left">Project Name</th>
@@ -350,6 +372,8 @@ function DashboardTab({
                     <th className="px-3 py-2 text-left">Department</th>
                     <th className="px-3 py-2 text-left">Agreement Number</th>
                     <th className="px-3 py-2 text-left">Contractor</th>
+                    <th className="px-3 py-2 text-left">NIT Number</th>
+                    <th className="px-3 py-2 text-left">NIT Date</th>
                     <th className="px-3 py-2 text-left">Current Sub-Stage</th>
                     <th className="px-3 py-2 text-left">Last Updated</th>
                   </tr>
@@ -403,6 +427,12 @@ function ProjectDrillRow({
         {detail.isLoading ? '…' : detail.data?.agreementNumber ?? '—'}
       </td>
       <td className="px-3 py-2 text-[#374151]">{project.contractor ?? '—'}</td>
+      <td className="px-3 py-2">
+        <NitReadOnly value={project.nitNumber} kind="number" />
+      </td>
+      <td className="px-3 py-2">
+        <NitReadOnly value={project.nitDate} kind="date" />
+      </td>
       <td className="px-3 py-2">
         <span className="inline-flex rounded-full bg-[#EFF6FF] px-2 py-0.5 text-[10.5px] font-semibold text-[#1D4ED8]">
           {subStage}
@@ -557,7 +587,7 @@ function StagesTab({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-[12px]">
+            <table className="w-full min-w-[860px] border-collapse text-[12px]">
               <thead>
                 <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
                   <th className="w-8 px-2 py-2">
@@ -566,44 +596,29 @@ function StagesTab({
                   <th className="px-3 py-2 text-left">Project Name</th>
                   <th className="px-3 py-2 text-left">Division</th>
                   <th className="px-3 py-2 text-left">Contractor</th>
+                  <th className="px-3 py-2 text-left">NIT Number</th>
+                  <th className="px-3 py-2 text-left">NIT Date</th>
+                  {stagesActive === 'NIT Published' ? (
+                    <th className="px-3 py-2 text-left">
+                      <span className="sr-only">NIT actions</span>
+                    </th>
+                  ) : null}
                   <th className="px-3 py-2 text-left">Last Updated</th>
                 </tr>
               </thead>
               <tbody>
-                {projects.map((p) => {
-                  const division = p.divisionId
-                    ? lookups?.divisions.find((d) => d.divisionId === p.divisionId)?.divisionName ?? '—'
-                    : '—';
-                  const checked = selectedIds.has(p.projectId);
-                  return (
-                    <tr
-                      key={p.projectId}
-                      className={cn(
-                        'border-b border-[#F3F4F6]',
-                        checked ? 'bg-[#EFF6FF]' : 'hover:bg-[#F0F7FF]',
-                      )}
-                    >
-                      <td className="px-2 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => onToggleSelect(p.projectId)}
-                          aria-label={`Select ${p.projectName}`}
-                          className="h-3.5 w-3.5 cursor-pointer accent-[#1D4ED8]"
-                          disabled={!canTransfer || busy}
-                        />
-                      </td>
-                      <td className="px-3 py-2 font-semibold text-[#1D4ED8]">
-                        {p.projectName}
-                      </td>
-                      <td className="px-3 py-2 text-[#374151]">{division}</td>
-                      <td className="px-3 py-2 text-[#374151]">{p.contractor ?? '—'}</td>
-                      <td className="px-3 py-2 tabular-nums text-[#6B7280]">
-                        {p.lastUpdated ? formatDate(p.lastUpdated.slice(0, 10)) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {projects.map((p) => (
+                  <StageProjectRow
+                    key={p.projectId}
+                    project={p}
+                    lookups={lookups}
+                    checked={selectedIds.has(p.projectId)}
+                    onToggle={() => onToggleSelect(p.projectId)}
+                    disableCheckbox={!canTransfer || busy}
+                    isNitPublished={stagesActive === 'NIT Published'}
+                    canEditNit={canTransfer}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
@@ -611,6 +626,170 @@ function StagesTab({
       </section>
     </div>
   );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * StageProjectRow — one row inside the Project Stages tab's table.
+ *
+ * Splits out its own state so NIT edits stay local (no lifting drafts up
+ * to the parent). When the active sub-stage is NIT Published we render an
+ * inline text + date input pair + a Save button that only lights up when
+ * the row is dirty. Elsewhere the NIT columns render read-only with the
+ * "Yet to be Published / Yet to Declare" placeholders.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+function StageProjectRow({
+  project, lookups, checked, onToggle, disableCheckbox,
+  isNitPublished, canEditNit,
+}: {
+  project: ProjectListItem;
+  lookups: Lookups | undefined;
+  checked: boolean;
+  onToggle: () => void;
+  disableCheckbox: boolean;
+  isNitPublished: boolean;
+  canEditNit: boolean;
+}): JSX.Element {
+  const division = project.divisionId
+    ? lookups?.divisions.find((d) => d.divisionId === project.divisionId)?.divisionName ?? '—'
+    : '—';
+  const [updateNit, nitState] = useUpdateProjectNitMutation();
+  const [nitNumber, setNitNumber] = useState<string>(project.nitNumber ?? '');
+  const [nitDate, setNitDate] = useState<string>(project.nitDate ?? '');
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+
+  // Server value can shift under us (e.g. after a bulk transfer refetch or
+  // audit tag invalidation). Re-hydrate the row's local edits from the
+  // authoritative list-item so the display stays consistent.
+  useEffect(() => {
+    setNitNumber(project.nitNumber ?? '');
+    setNitDate(project.nitDate ?? '');
+  }, [project.nitNumber, project.nitDate]);
+
+  const dirty =
+    (project.nitNumber ?? '') !== nitNumber || (project.nitDate ?? '') !== nitDate;
+
+  const handleSave = async (): Promise<void> => {
+    setSaveErr(null);
+    try {
+      await updateNit({
+        projectId: project.projectId,
+        body: {
+          nitNumber: nitNumber.trim() === '' ? null : nitNumber.trim(),
+          nitDate: nitDate === '' ? null : nitDate,
+        },
+      }).unwrap();
+    } catch (err) {
+      setSaveErr(readError(err));
+    }
+  };
+
+  return (
+    <tr
+      className={cn(
+        'border-b border-[#F3F4F6]',
+        checked ? 'bg-[#EFF6FF]' : 'hover:bg-[#F0F7FF]',
+      )}
+    >
+      <td className="px-2 py-2 text-center">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          aria-label={`Select ${project.projectName}`}
+          className="h-3.5 w-3.5 cursor-pointer accent-[#1D4ED8]"
+          disabled={disableCheckbox}
+        />
+      </td>
+      <td className="px-3 py-2 font-semibold text-[#1D4ED8]">
+        {project.projectName}
+      </td>
+      <td className="px-3 py-2 text-[#374151]">{division}</td>
+      <td className="px-3 py-2 text-[#374151]">{project.contractor ?? '—'}</td>
+
+      {/* NIT Number cell — editable only during NIT Published */}
+      <td className="px-3 py-2">
+        {isNitPublished ? (
+          <input
+            type="text"
+            value={nitNumber}
+            onChange={(e) => setNitNumber(e.target.value)}
+            placeholder="e.g. NIT/BUIDCO/2026/07"
+            className="h-8 w-40 rounded border border-[#D1D5DB] bg-white px-2 text-[12px] disabled:cursor-not-allowed disabled:bg-[#F9FAFB]"
+            disabled={!canEditNit || nitState.isLoading}
+          />
+        ) : (
+          <NitReadOnly value={project.nitNumber} kind="number" />
+        )}
+      </td>
+
+      {/* NIT Date cell — editable only during NIT Published */}
+      <td className="px-3 py-2">
+        {isNitPublished ? (
+          <input
+            type="date"
+            value={nitDate}
+            onChange={(e) => setNitDate(e.target.value)}
+            className="h-8 w-36 rounded border border-[#D1D5DB] bg-white px-2 text-[12px] disabled:cursor-not-allowed disabled:bg-[#F9FAFB]"
+            disabled={!canEditNit || nitState.isLoading}
+          />
+        ) : (
+          <NitReadOnly value={project.nitDate} kind="date" />
+        )}
+      </td>
+
+      {/* Save button — only rendered during NIT Published */}
+      {isNitPublished ? (
+        <td className="px-3 py-2">
+          <div className="flex flex-col items-start gap-1">
+            <Button
+              size="xs"
+              onClick={() => void handleSave()}
+              disabled={!canEditNit || nitState.isLoading || !dirty}
+              title={
+                !canEditNit
+                  ? 'Read-only — needs Update Projects permission'
+                  : !dirty
+                    ? 'No changes to save'
+                    : undefined
+              }
+            >
+              {nitState.isLoading ? 'Saving…' : dirty ? 'Save' : '✓ Saved'}
+            </Button>
+            {saveErr ? (
+              <span className="text-[10.5px] text-[#B91C1C]">{saveErr}</span>
+            ) : null}
+          </div>
+        </td>
+      ) : null}
+
+      <td className="px-3 py-2 tabular-nums text-[#6B7280]">
+        {project.lastUpdated ? formatDate(project.lastUpdated.slice(0, 10)) : '—'}
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Render helper — actual NIT value in text-000 or the placeholder styled in
+ * amber italic so users see the difference between "not yet entered" and
+ * a real value at a glance.
+ */
+function NitReadOnly({
+  value,
+  kind,
+}: {
+  value: string | null;
+  kind: 'number' | 'date';
+}): JSX.Element {
+  if (!value || value.trim() === '') {
+    const placeholder = kind === 'number' ? displayNitNumber(null) : displayNitDate(null);
+    return <span className="italic text-[#B45309]">{placeholder}</span>;
+  }
+  if (kind === 'date') {
+    return <span className="tabular-nums text-[#111827]">{formatDate(value)}</span>;
+  }
+  return <span className="text-[#111827]">{value}</span>;
 }
 
 function readError(err: unknown): string {

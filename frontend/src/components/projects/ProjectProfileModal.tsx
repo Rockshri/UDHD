@@ -19,6 +19,7 @@ import {
   formatPercent,
   daysBetween,
 } from '../../lib/formatters';
+import { displayNitDate, displayNitNumber } from '../../features/tender/tenderWorkflow';
 
 // ── Field key type ────────────────────────────────────────────────────────────
 type FieldKey =
@@ -32,9 +33,10 @@ type FieldKey =
   | 'projectBrief'
   // Overview card
   | 'city' | 'district' | 'division' | 'region' | 'sector' | 'schemes' | 'pd' | 'projectStageV2' | 'contractType'
-  // Schedule & Delay card
+  // Schedule & Delay card (includes tender NIT details)
   | 'plannedEndDate' | 'revisedEndDate' | 'expectedCompletion'
   | 'scheduledProgressPct' | 'delayReason' | 'deptStuckAt'
+  | 'nitNumber' | 'nitDate'
   // Contract & Financial card
   | 'agreementNumber' | 'agreementDate' | 'appointedDate' | 'contractValueCr'
   | 'mobAdvanceIssuedCr' | 'mobAdvanceRecoveredCr' | 'advanceOutstandingCr'
@@ -114,6 +116,8 @@ const FIELD_GROUPS: GroupDef[] = [
       { key: 'scheduledProgressPct',label: 'Scheduled Progress %' },
       { key: 'delayReason',         label: 'Delay Reason' },
       { key: 'deptStuckAt',         label: 'Department Stuck At' },
+      { key: 'nitNumber',           label: 'NIT Number' },
+      { key: 'nitDate',             label: 'NIT Date' },
     ],
   },
   {
@@ -350,6 +354,20 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
     { label: 'Scheduled Progress %', value: formatPercent(project?.scheduledProgressPct), fk: 'scheduledProgressPct' },
     { label: 'Delay Reason',          value: project?.delayReason,                        fk: 'delayReason' },
     { label: 'Department Stuck At',   value: project?.deptStuckAt,                        fk: 'deptStuckAt' },
+    // NIT_addition_instructions.md §4 — read-only in the profile modal.
+    // Editable only from the Tender Dashboard's NIT Published sub-stage.
+    {
+      label: 'NIT Number',
+      value: project?.nitNumber && project.nitNumber.trim() !== ''
+        ? project.nitNumber
+        : displayNitNumber(null),
+      fk: 'nitNumber',
+    },
+    {
+      label: 'NIT Date',
+      value: project?.nitDate ? formatDate(project.nitDate) : displayNitDate(null),
+      fk: 'nitDate',
+    },
   ];
 
   const contractFields: GridField[] = [
@@ -433,7 +451,7 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
 
         {/* ── Gradient header ─────────────────────────────────────────────── */}
         <header
-          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-t-xl px-5 py-3.5"
+          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-t-xl px-3 py-3 sm:px-5 sm:py-3.5"
           style={{ background: 'linear-gradient(100deg,#1E3A5F 0%,#2563EB 100%)' }}
         >
           <div className="min-w-0">
@@ -491,7 +509,7 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
         {showSettings ? (
           <div className="border-b border-[#E5E7EB] bg-white">
             {/* Settings header */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F3F4F6] px-5 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F3F4F6] px-3 py-3 sm:px-5">
               <span className="text-[12.5px] font-bold text-[#1E3A5F]">
                 ⚙️ Customise Profile Fields
               </span>
@@ -521,7 +539,7 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
             </div>
 
             {/* Search */}
-            <div className="px-5 pb-3 pt-3">
+            <div className="px-3 pb-3 pt-3 sm:px-5">
               <input
                 ref={searchRef}
                 value={fieldSearch}
@@ -532,7 +550,7 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
             </div>
 
             {/* Groups + field chips */}
-            <div className="max-h-72 overflow-y-auto px-5 pb-4">
+            <div className="max-h-72 overflow-y-auto px-3 pb-4 sm:px-5">
               {filteredGroups.length === 0 ? (
                 <p className="text-[12px] text-[#9CA3AF]">No fields match.</p>
               ) : (
@@ -575,7 +593,7 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
         ) : null}
 
         {/* ── Modal body ──────────────────────────────────────────────────── */}
-        <div className="px-6 py-5" id="project-profile-print-area">
+        <div className="px-3 py-4 sm:px-6 sm:py-5" id="project-profile-print-area">
           {detail.isLoading || !project ? (
             <div className="space-y-3">
               <Skeleton className="h-8 w-3/4" />

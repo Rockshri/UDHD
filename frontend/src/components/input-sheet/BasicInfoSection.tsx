@@ -16,12 +16,14 @@ interface Props {
    * data itself stays visible for context.
    */
   readOnly?: boolean;
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
 /** Contract Type dropdown — required field (Phase A §3.1). */
 const CONTRACT_TYPES = ['Work Contract', 'Service Contract', 'O&M Contract', 'Others'] as const;
 
-export function BasicInfoSection({ draft, setField, readOnly = false }: Props): JSX.Element {
+export function BasicInfoSection({ draft, setField, readOnly = false, num = '01' }: Props): JSX.Element {
   const { data: lookups } = useGetLookupsQuery();
   const sectors = lookups?.sectors ?? [];
   const districts = lookups?.districts ?? [];
@@ -47,7 +49,7 @@ export function BasicInfoSection({ draft, setField, readOnly = false }: Props): 
   return (
     <Card>
       <CardContent className="pt-4">
-        <FormSectionHeader num="01" title="Basic Info" sub="Core project identification details" />
+        <FormSectionHeader num={num} title="Basic Info" sub="Core project identification details" />
         {readOnly ? <FixedInputReadOnlyBanner /> : null}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <FormField

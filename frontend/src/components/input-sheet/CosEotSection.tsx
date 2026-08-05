@@ -14,6 +14,8 @@ import type { CosCategory, CosEotItem, CosEotUpsertPayload } from '../../types/a
 interface Props {
   projectId: string | null;
   items: CosEotItem[];
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
 const CATEGORIES: CosCategory[] = [
@@ -86,7 +88,7 @@ function fromItem(item: CosEotItem): DraftRow {
   };
 }
 
-export function CosEotSection({ projectId, items }: Props): JSX.Element {
+export function CosEotSection({ projectId, items, num = '03' }: Props): JSX.Element {
   const [createCosEot, createState] = useCreateCosEotMutation();
   const [updateCosEot, updateState] = useUpdateCosEotMutation();
   const [deleteCosEot, deleteState] = useDeleteCosEotMutation();
@@ -119,7 +121,7 @@ export function CosEotSection({ projectId, items }: Props): JSX.Element {
       <Card>
         <CardContent className="pt-4">
           <FormSectionHeader
-            num="03"
+            num={num}
             title="Change of Scope (CoS) & Extension of Time (EoT)"
             sub="Save the project first — CoS/EoT rows attach to an existing project."
           />
@@ -166,7 +168,7 @@ export function CosEotSection({ projectId, items }: Props): JSX.Element {
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="03"
+          num={num}
           title="Change of Scope (CoS) & Extension of Time (EoT)"
           sub="Each row is a separate CoS event. Revised End Date on the latest row feeds Section 02."
           right={

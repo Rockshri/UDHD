@@ -50,3 +50,13 @@ usersRouter.patch('/:userId', async (req, res, next) => {
     next(err);
   }
 });
+
+usersRouter.delete('/:userId', async (req, res, next) => {
+  try {
+    const { userId } = idParam.parse(req.params);
+    const out = await service.deleteUser(userId, actorFromReq(req));
+    res.json(out);
+  } catch (err) {
+    next(err);
+  }
+});

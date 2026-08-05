@@ -609,7 +609,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
       >
         {/* ── Gradient header (matches ProjectProfileModal) ────────────── */}
         <header
-          className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-5 py-3"
+          className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-5"
           style={{ background: 'linear-gradient(100deg,#1E3A5F 0%,#2563EB 100%)' }}
         >
           <div className="min-w-0">
@@ -1080,8 +1080,8 @@ function ProjectList({
   schemesById: Map<number, string>;
 }): JSX.Element {
   return (
-    <div className="rounded-lg border border-[#E5E7EB] bg-white shadow-sm">
-      <table className="w-full border-collapse text-[12px]">
+    <div className="overflow-x-auto rounded-lg border border-[#E5E7EB] bg-white shadow-sm">
+      <table className="w-full min-w-[720px] border-collapse text-[12px]">
         <thead>
           <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
             {columns.map((c) => (

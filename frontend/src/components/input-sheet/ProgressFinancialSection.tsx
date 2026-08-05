@@ -8,6 +8,8 @@ interface Props {
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
   cosItems: CosEotItem[];
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
 /**
@@ -20,7 +22,7 @@ function deriveSanctionedCost(draft: ProjectDraft): number | null {
   return draft.revisedAaAmountCr ?? draft.aaAmountCr ?? null;
 }
 
-export function ProgressFinancialSection({ draft, setField, cosItems }: Props): JSX.Element {
+export function ProgressFinancialSection({ draft, setField, cosItems, num = '02' }: Props): JSX.Element {
   const totalEotDays = cosItems.reduce((sum, c) => sum + (c.eotDaysGranted ?? 0), 0);
   const sanctionedCost = deriveSanctionedCost(draft);
   const sanctionedSource = draft.revisedAaAmountCr !== null
@@ -33,7 +35,7 @@ export function ProgressFinancialSection({ draft, setField, cosItems }: Props): 
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="02"
+          num={num}
           title="Progress & Financial"
           sub="Sanctioned Cost auto-fills from Revised AA (or AA). CoS totals derive from Section 04."
         />

@@ -47,6 +47,14 @@ export interface ProjectDraft {
    * so the Input Sheet's stage gate can read the current value.
    */
   tenderSubStage: TenderSubStage | null;
+  /**
+   * NIT details — server-owned, editable ONLY from the Tender Dashboard's
+   * NIT Published sub-stage. Present here for read-only display in views
+   * that hydrate from ProjectDetail; the general PATCH strips these fields
+   * so the draft-based save can't overwrite them accidentally.
+   */
+  nitNumber: string | null;
+  nitDate: string | null;
   status: ProjectStatus;
   plannedEndDate: string | null;
   revisedEndDate: string | null;
@@ -129,6 +137,8 @@ export const EMPTY_DRAFT: ProjectDraft = {
   currentPhase: null,
   projectStageV2: null,
   tenderSubStage: null,
+  nitNumber: null,
+  nitDate: null,
   status: 'Not Started',
   plannedEndDate: null,
   revisedEndDate: null,

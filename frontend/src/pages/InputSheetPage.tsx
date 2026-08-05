@@ -105,7 +105,9 @@ export function InputSheetPage(): JSX.Element {
   const [updateProject, updateState] = useUpdateProjectMutation();
 
   const [section, setSection] = useState<SectionId>('basic');
-  const [groupOverride, setGroupOverride] = useState<SectionGroup | null>(null);
+  // Open on the ALL Fields group by default — it renders every section in
+  // sequential order and is the fastest way to scan the whole form.
+  const [groupOverride, setGroupOverride] = useState<SectionGroup | null>(ALL_GROUP);
   const [flash, setFlash] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
   const activeGroup: SectionGroup = groupOverride ?? groupOf(section);
   const activeSubTabs =
@@ -287,7 +289,7 @@ export function InputSheetPage(): JSX.Element {
           <div
             role="tablist"
             aria-label="Input group"
-            className="inline-flex rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] p-1 shadow-inner"
+            className="flex w-full flex-wrap gap-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] p-1 shadow-inner sm:inline-flex sm:w-auto sm:flex-nowrap sm:gap-0"
           >
             <GroupTab
               label="ALL Fields"
@@ -343,12 +345,23 @@ export function InputSheetPage(): JSX.Element {
           ) : null}
         </div>
 
+        {/*
+          Render order:
+            Fixed / Variable tabs — only the picked `section` renders (position
+              in JSX below is irrelevant; per-section default `num` prop is used).
+            ALL Fields tab — every section renders in JSX order. Contract &
+              Financial Security is intentionally slotted AFTER CoS/EoT here
+              per the request; explicit `num` overrides give the ALL tab a
+              clean sequential 01..09 numbering.
+        */}
         <div className={activeGroup === 'all' ? 'space-y-4' : undefined}>
           {activeGroup === 'all' || section === 'basic' ? (
-            <BasicInfoSection draft={draft} setField={setField} readOnly={!canEditFixed} />
-          ) : null}
-          {activeGroup === 'all' || section === 'contract' ? (
-            <ContractSecuritySection draft={draft} setField={setField} readOnly={!canEditFixed} />
+            <BasicInfoSection
+              draft={draft}
+              setField={setField}
+              readOnly={!canEditFixed}
+              {...(activeGroup === 'all' ? { num: '01' } : {})}
+            />
           ) : null}
           {activeGroup === 'all' || section === 'phase' ? (
             <PhaseDatesSection
@@ -356,6 +369,7 @@ export function InputSheetPage(): JSX.Element {
               draft={draft}
               setField={setField}
               cosItems={cosEot.data?.items ?? []}
+              {...(activeGroup === 'all' ? { num: '02' } : {})}
             />
           ) : null}
           {activeGroup === 'all' || section === 'progress' ? (
@@ -363,10 +377,23 @@ export function InputSheetPage(): JSX.Element {
               draft={draft}
               setField={setField}
               cosItems={cosEot.data?.items ?? []}
+              {...(activeGroup === 'all' ? { num: '03' } : {})}
             />
           ) : null}
           {activeGroup === 'all' || section === 'cos' ? (
-            <CosEotSection projectId={projectId ?? null} items={cosEot.data?.items ?? []} />
+            <CosEotSection
+              projectId={projectId ?? null}
+              items={cosEot.data?.items ?? []}
+              {...(activeGroup === 'all' ? { num: '04' } : {})}
+            />
+          ) : null}
+          {activeGroup === 'all' || section === 'contract' ? (
+            <ContractSecuritySection
+              draft={draft}
+              setField={setField}
+              readOnly={!canEditFixed}
+              {...(activeGroup === 'all' ? { num: '05' } : {})}
+            />
           ) : null}
           {activeGroup === 'all' || section === 'geo' ? (
             <GeoTaggingSection
@@ -374,6 +401,7 @@ export function InputSheetPage(): JSX.Element {
               draft={draft}
               setField={setField}
               photos={photos.data?.items ?? []}
+              {...(activeGroup === 'all' ? { num: '06' } : {})}
             />
           ) : null}
           {activeGroup === 'all' || section === 'action' ? (
@@ -382,13 +410,21 @@ export function InputSheetPage(): JSX.Element {
               draft={draft}
               setField={setField}
               actions={mgmt.data?.items ?? []}
+              {...(activeGroup === 'all' ? { num: '07' } : {})}
             />
           ) : null}
           {activeGroup === 'all' || section === 'om' ? (
-            <OmDetailsSection draft={draft} setField={setField} />
+            <OmDetailsSection
+              draft={draft}
+              setField={setField}
+              {...(activeGroup === 'all' ? { num: '08' } : {})}
+            />
           ) : null}
           {activeGroup === 'all' || section === 'milestones' ? (
-            <MilestonesSection projectId={projectId ?? null} />
+            <MilestonesSection
+              projectId={projectId ?? null}
+              {...(activeGroup === 'all' ? { num: '09' } : {})}
+            />
           ) : null}
         </div>
 

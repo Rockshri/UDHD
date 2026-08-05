@@ -103,6 +103,14 @@ export const project = pgTable(
      * two columns.
      */
     tenderSubStage: varchar('tender_sub_stage', { length: 30 }),
+    /**
+     * NIT (Notice Inviting Tender) reference number, populated during the
+     * NIT Published sub-stage. Editable only from the Tender Dashboard
+     * while the project is in that sub-stage (NIT_addition_instructions.md §4).
+     */
+    nitNumber: varchar('nit_number', { length: 80 }),
+    /** NIT publication date; paired with nitNumber (see above). */
+    nitDate: date('nit_date'),
     plannedEndDate: date('planned_end_date'),
     revisedEndDate: date('revised_end_date'),
     delayReason: text('delay_reason'),

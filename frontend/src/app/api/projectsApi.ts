@@ -20,6 +20,14 @@ export interface TenderTransferResponse {
   skipped: Array<{ projectId: string; reason: string }>;
 }
 
+export interface UpdateProjectNitPayload {
+  projectId: string;
+  body: {
+    nitNumber: string | null;
+    nitDate: string | null;
+  };
+}
+
 export interface ListProjectsQuery {
   limit?: number;
   cursor?: string;
@@ -122,6 +130,24 @@ export const projectsApi = api.injectEndpoints({
         return tags;
       },
     }),
+
+    /**
+     * NIT_addition_instructions.md §1 — update NIT Number + NIT Date for
+     * a project. Backend rejects unless the project is at Tender / NIT
+     * Published; the UI only surfaces this control in that view.
+     */
+    updateProjectNit: build.mutation<ProjectDetail, UpdateProjectNitPayload>({
+      query: ({ projectId, body }) => ({
+        url: `projects/${projectId}/nit`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: 'Project', id: arg.projectId },
+        { type: 'ProjectList', id: 'LIST' },
+        'Audit',
+      ],
+    }),
   }),
   overrideExisting: false,
 });
@@ -136,4 +162,5 @@ export const {
   useGetPhysicalHistoryQuery,
   useGetMilestoneHistoryQuery,
   useTransferTenderMutation,
+  useUpdateProjectNitMutation,
 } = projectsApi;

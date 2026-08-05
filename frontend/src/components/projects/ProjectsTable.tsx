@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ProjectListItem } from '../../types/api';
 import type { Lookups } from '../../types/api';
+import { displayNitDate, displayNitNumber } from '../../features/tender/tenderWorkflow';
 import { formatCurrencyCr, formatDate } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -291,6 +292,38 @@ const COLUMNS: Column[] = [
         <span className="text-[#D1D5DB]">—</span>
       ),
   },
+  {
+    // NIT_addition_instructions.md §5/§6 — always show the value or the
+    // "Yet to be Published" placeholder so Project Directors can spot rows
+    // that still need NIT publication at a glance. Off by default (per the
+    // user preference); toggle from the ⚙ Columns picker.
+    key: 'nitNumber',
+    label: 'NIT Number',
+    minWidth: 160,
+    defaultVisible: false,
+    render: (r) => {
+      const val = r.nitNumber;
+      return val && val.trim() !== '' ? (
+        <span className="text-[#111827]">{val}</span>
+      ) : (
+        <span className="italic text-[#B45309]">{displayNitNumber(null)}</span>
+      );
+    },
+    sortValue: (r) => r.nitNumber,
+  },
+  {
+    key: 'nitDate',
+    label: 'NIT Date',
+    minWidth: 130,
+    defaultVisible: false,
+    render: (r) =>
+      r.nitDate ? (
+        <span className="tabular-nums text-[#111827]">{formatDate(r.nitDate)}</span>
+      ) : (
+        <span className="italic text-[#B45309]">{displayNitDate(null)}</span>
+      ),
+    sortValue: (r) => r.nitDate,
+  },
 ];
 
 export const ALL_COLUMN_KEYS = COLUMNS.map((c) => c.key);
@@ -436,7 +469,10 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
+        {/* min-w-[960px]: on phones/tablets the many-column table would squish
+            below readability. Force a min width so the wrapper scrolls
+            horizontally instead. */}
+        <table className="w-full min-w-[960px] border-collapse text-xs">
           <thead className="bg-[#F9FAFB]">
             <tr>
               {visibleColumns.map((c) => (

@@ -17,6 +17,8 @@ interface Props {
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
   actions: MgmtActionItem[];
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
 const PRIORITIES: Priority[] = ['High', 'Medium', 'Low', 'N/A'];
@@ -26,6 +28,7 @@ export function ActionRemarksSection({
   draft,
   setField,
   actions,
+  num = '05',
 }: Props): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [newTopic, setNewTopic] = useState('');
@@ -81,7 +84,7 @@ export function ActionRemarksSection({
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="05"
+          num={num}
           title="Action & Remarks"
           sub="Outstanding gaps, priority, and management action items"
         />

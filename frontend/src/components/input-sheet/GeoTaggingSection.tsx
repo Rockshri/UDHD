@@ -15,9 +15,11 @@ interface Props {
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
   photos: GeoPhoto[];
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
-export function GeoTaggingSection({ projectId, draft, setField, photos }: Props): JSX.Element {
+export function GeoTaggingSection({ projectId, draft, setField, photos, num = '04' }: Props): JSX.Element {
   const [url, setUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function GeoTaggingSection({ projectId, draft, setField, photos }: Props)
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="04"
+          num={num}
           title="Geo-Tagging"
           sub="Reference/overview URL for the dashboard + linked site photos"
         />

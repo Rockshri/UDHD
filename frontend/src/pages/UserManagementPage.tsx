@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useGetLookupsQuery } from '../app/api/lookupsApi';
 import {
   useCreateUserMutation,
+  useDeleteUserMutation,
   useListUsersQuery,
   useUpdateUserMutation,
 } from '../app/api/usersApi';
@@ -30,10 +31,13 @@ export function UserManagementPage(): JSX.Element {
   const { data: lookups } = useGetLookupsQuery();
   const [createUser, createState] = useCreateUserMutation();
   const [updateUser, updateState] = useUpdateUserMutation();
+  const [deleteUser, deleteState] = useDeleteUserMutation();
 
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
-  const busy = createState.isLoading || updateState.isLoading;
+  const [deleting, setDeleting] = useState<UserRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const busy = createState.isLoading || updateState.isLoading || deleteState.isLoading;
 
   const canPromote = me?.role === 'MD';
   // MD sees every role; Admin can create Viewer and PD.
@@ -122,6 +126,14 @@ export function UserManagementPage(): JSX.Element {
                         me?.role === 'MD'
                         || (me?.role === 'Admin' && (u.role === 'Viewer' || u.role === 'PD'));
                       const isSelf = me?.userId === u.userId;
+                      // Delete policy (mirrors backend usersService.deleteUser):
+                      //   MD    → any user except themselves
+                      //   Admin → PD/Viewer only, never themselves
+                      const canDelete =
+                        !isSelf && (
+                          me?.role === 'MD'
+                          || (me?.role === 'Admin' && (u.role === 'Viewer' || u.role === 'PD'))
+                        );
                       const createdByLabel = u.createdBy
                         ? usersById.get(u.createdBy)?.username ?? `#${u.createdBy}`
                         : '—';
@@ -200,15 +212,33 @@ export function UserManagementPage(): JSX.Element {
                             {formatDate(u.lastLogin)}
                           </td>
                           <td className="px-3 py-2">
-                            {canEdit ? (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                onClick={() => setEditing(u)}
-                                disabled={busy}
-                              >
-                                Edit
-                              </Button>
+                            {canEdit || canDelete ? (
+                              <div className="flex items-center gap-1.5">
+                                {canEdit ? (
+                                  <Button
+                                    size="xs"
+                                    variant="outline"
+                                    onClick={() => setEditing(u)}
+                                    disabled={busy}
+                                  >
+                                    Edit
+                                  </Button>
+                                ) : null}
+                                {canDelete ? (
+                                  <Button
+                                    size="xs"
+                                    variant="destructive"
+                                    onClick={() => {
+                                      setDeleteError(null);
+                                      setDeleting(u);
+                                    }}
+                                    disabled={busy}
+                                    title={`Delete ${u.username}`}
+                                  >
+                                    Delete
+                                  </Button>
+                                ) : null}
+                              </div>
                             ) : (
                               <span className="text-[10.5px] text-[#9CA3AF]">Read-only</span>
                             )}
@@ -239,9 +269,133 @@ export function UserManagementPage(): JSX.Element {
             }}
           />
         ) : null}
+
+        {deleting ? (
+          <DeleteUserConfirm
+            user={deleting}
+            busy={deleteState.isLoading}
+            errorText={deleteError}
+            onCancel={() => {
+              setDeleting(null);
+              setDeleteError(null);
+            }}
+            onConfirm={async () => {
+              try {
+                await deleteUser(deleting.userId).unwrap();
+                setDeleting(null);
+                setDeleteError(null);
+              } catch (e) {
+                setDeleteError(extractApiErrorMessage(e));
+              }
+            }}
+          />
+        ) : null}
       </article>
     </RoleGate>
   );
+}
+
+/**
+ * Confirmation modal for deleting a user. Blocks the destructive action
+ * behind a typed username check so a stray click can't wipe an account.
+ */
+function DeleteUserConfirm({
+  user, busy, errorText, onCancel, onConfirm,
+}: {
+  user: UserRow;
+  busy: boolean;
+  errorText: string | null;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}): JSX.Element {
+  const [typed, setTyped] = useState('');
+  const matches = typed === user.username;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-user-title"
+      className="fixed inset-0 z-50 flex items-center justify-center px-3"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={busy ? undefined : onCancel}
+      />
+      <div className="relative w-full max-w-md rounded-xl border border-[#E5E7EB] bg-white shadow-2xl">
+        <header className="rounded-t-xl border-b border-[#F3F4F6] bg-[#FEF2F2] px-5 py-4">
+          <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#B91C1C]">
+            ⚠ Destructive action
+          </p>
+          <h3 id="delete-user-title" className="mt-0.5 text-[16px] font-bold text-[#111827]">
+            Delete user <span className="text-[#B91C1C]">{user.username}</span>?
+          </h3>
+        </header>
+
+        <div className="space-y-3 px-5 py-4 text-[13px] text-[#374151]">
+          <p>
+            This will permanently remove <strong>{user.fullName || user.username}</strong>{' '}
+            <span className="text-[#6B7280]">
+              ({user.role}
+              {user.role === 'PD' && user.divisions.length > 0
+                ? ` · ${user.divisions.length} division${user.divisions.length === 1 ? '' : 's'}`
+                : ''}
+              )
+            </span>{' '}
+            from BUIDCO. They will lose access immediately and cannot sign
+            in again unless recreated.
+          </p>
+          <p className="text-[12px] text-[#6B7280]">
+            Historical audit entries and project records they created will
+            remain intact.
+          </p>
+          <label className="mt-2 grid gap-1 text-[12px] font-semibold text-[#374151]">
+            Type <span className="rounded bg-[#F3F4F6] px-1 py-0.5 font-mono text-[11px] text-[#B91C1C]">{user.username}</span> to confirm:
+            <input
+              type="text"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              disabled={busy}
+              autoFocus
+              className="h-9 w-full rounded border border-[#D1D5DB] bg-white px-3 text-sm text-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B91C1C] focus-visible:ring-offset-1"
+              autoComplete="off"
+            />
+          </label>
+          {errorText ? (
+            <p
+              role="alert"
+              className="rounded border border-[#FCA5A5] bg-[#FEF2F2] px-3 py-2 text-[12px] font-medium text-[#B91C1C]"
+            >
+              {errorText}
+            </p>
+          ) : null}
+        </div>
+
+        <footer className="flex items-center justify-end gap-2 rounded-b-xl border-t border-[#F3F4F6] bg-[#F9FAFB] px-5 py-3">
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onConfirm}
+            disabled={busy || !matches}
+            title={matches ? undefined : `Type "${user.username}" to enable`}
+          >
+            {busy ? 'Deleting…' : 'Delete user'}
+          </Button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function extractApiErrorMessage(err: unknown): string {
+  if (!err || typeof err !== 'object') return 'Delete failed. Please try again.';
+  const anyErr = err as { status?: number; data?: { error?: { message?: string } } };
+  return anyErr.data?.error?.message ?? `Delete failed (HTTP ${anyErr.status ?? '?'})`;
 }
 
 function PermCell({

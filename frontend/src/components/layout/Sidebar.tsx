@@ -2,23 +2,31 @@ import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   AlertTriangle,
+  BarChart3,
+  Calendar,
   CheckSquare,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   CloudRain,
   FileEdit,
+  FileText,
   FolderTree,
   Gavel,
+  HelpCircle,
+  History,
   LayoutDashboard,
   Map,
   MapPin,
   Tag,
+  Users,
+  Wrench,
   X,
 } from 'lucide-react';
-import { useAppSelector } from '../../app/hooks';
-import { selectCurrentUser } from '../../features/auth/authSlice';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { openMdBriefing, selectCurrentUser } from '../../features/auth/authSlice';
 import { cn } from '../../lib/utils';
+import { RoleGate } from '../auth/RoleGate';
 import type { UserRole } from '../../types/api';
 
 /**
@@ -62,12 +70,15 @@ interface Props {
   onCloseMobile: () => void;
   /** Opens the Tender Dashboard modal (separate group below the primary nav). */
   onOpenTenderDashboard: () => void;
+  /** Opens the KPI Guide drawer (mirrors the TopNav pill for mobile users). */
+  onOpenKpiGuide: () => void;
 }
 
 export function Sidebar({
-  collapsed, onToggleCollapsed, mobileOpen, onCloseMobile, onOpenTenderDashboard,
+  collapsed, onToggleCollapsed, mobileOpen, onCloseMobile, onOpenTenderDashboard, onOpenKpiGuide,
 }: Props): JSX.Element {
   const currentUser = useAppSelector(selectCurrentUser);
+  const dispatch = useAppDispatch();
   const role = currentUser?.role;
   const visibleNav = PRIMARY_NAV.filter(
     (item) => !item.hideFor || !role || !item.hideFor.includes(role),
@@ -191,7 +202,111 @@ export function Sidebar({
                 }}
               />
             </li>
+            {/*
+              User Management — MD/Admin only. Sits at the bottom of the
+              sidebar so admin actions are grouped together. Also mirrored
+              in the mobile Tools section below for parity, but that
+              duplicate is hidden on `lg` since this entry covers it.
+            */}
+            <RoleGate allow={['MD', 'Admin']}>
+              <li>
+                <SidebarLink
+                  to="/users"
+                  label="User Management"
+                  Icon={Users}
+                  collapsed={collapsed}
+                  end={false}
+                  onNavigate={onCloseMobile}
+                />
+              </li>
+            </RoleGate>
           </ul>
+
+          {/*
+            Mobile-only utility section (< lg). Mirrors the TopNav utility
+            pills so tablet/phone users still have access to Input Sheet,
+            MoM, O&M, MD Briefing, KPI Guide, Audit Trail, and Users —
+            without those pills overflowing the 50px header on small screens.
+          */}
+          <div className="lg:hidden">
+            <hr aria-hidden className="mx-2 my-2 border-t border-[#E5E7EB]" />
+            <p className="px-4 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-[#9CA3AF]">
+              Tools
+            </p>
+            <ul className="flex flex-col gap-0.5 px-2">
+              <li>
+                <SidebarLink
+                  to="/input-sheet"
+                  label="Input Sheet"
+                  Icon={FileText}
+                  collapsed={false}
+                  end={false}
+                  onNavigate={onCloseMobile}
+                />
+              </li>
+              <RoleGate allow={['MD']}>
+                <li>
+                  <SidebarButton
+                    label="MD Portfolio Briefing"
+                    Icon={BarChart3}
+                    collapsed={false}
+                    onClick={() => {
+                      onCloseMobile();
+                      dispatch(openMdBriefing());
+                    }}
+                  />
+                </li>
+              </RoleGate>
+              <li>
+                <SidebarLink
+                  to="/mom"
+                  label="MoM"
+                  Icon={Calendar}
+                  collapsed={false}
+                  end={false}
+                  onNavigate={onCloseMobile}
+                />
+              </li>
+              <li>
+                <SidebarLink
+                  to="/om"
+                  label="O&M"
+                  Icon={Wrench}
+                  collapsed={false}
+                  end={false}
+                  onNavigate={onCloseMobile}
+                />
+              </li>
+              <li>
+                <SidebarButton
+                  label="KPI Guide"
+                  Icon={HelpCircle}
+                  collapsed={false}
+                  onClick={() => {
+                    onCloseMobile();
+                    onOpenKpiGuide();
+                  }}
+                />
+              </li>
+              <RoleGate allow={['MD']}>
+                <li>
+                  <SidebarLink
+                    to="/audit"
+                    label="Audit Trail"
+                    Icon={History}
+                    collapsed={false}
+                    end={false}
+                    onNavigate={onCloseMobile}
+                  />
+                </li>
+              </RoleGate>
+              {/*
+                User Management was here but is now a first-class item
+                above (in the always-visible section), so this duplicate
+                mobile Tools entry is removed to prevent showing it twice.
+              */}
+            </ul>
+          </div>
         </nav>
       </aside>
     </>
@@ -289,3 +404,4 @@ function SidebarLink({
     </NavLink>
   );
 }
+

@@ -44,14 +44,16 @@ export function ProjectsFilterBar({
 
   return (
     <div className="space-y-2 rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-sm">
-      {/* Row 1 — 5 selects (down from 6, District removed). */}
-      <div className="grid gap-2 lg:grid-cols-[1.5fr_repeat(5,_1fr)]">
-        <label className="grid gap-1">
+      {/* Row 1 — search + 5 selects. Mobile: 1 col; sm: 2 cols; md: 3 cols;
+          lg+: original single row with wider search. Search spans the full row
+          up to md so the placeholder text isn't truncated. */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[1.5fr_repeat(5,_1fr)]">
+        <label className="grid gap-1 sm:col-span-2 md:col-span-3 lg:col-span-1">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">Search</span>
           <Input
             value={filters.search}
             onChange={(e) => setFilter('search', e.target.value)}
-            placeholder="Name, city, contractor…"
+            placeholder="Name, NIT number, or project ID…"
           />
         </label>
 
@@ -136,7 +138,7 @@ export function ProjectsFilterBar({
           }
           compact
         />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           <span className="text-xs text-[#6B7280]">
             {activeCount > 0 ? (
               <>
@@ -179,7 +181,16 @@ interface SelectProps {
 function Select({ label, value, onChange, options, compact }: SelectProps): JSX.Element {
   const normalized = options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
   return (
-    <label className={cn('grid gap-1', compact ? 'min-w-[200px]' : '')}>
+    <label
+      className={cn(
+        'grid gap-1',
+        // `compact` = row-2 selects (Region/Division/Scheme). They need width
+        // for readable dropdown labels but must not push past the viewport on
+        // phones — 100% on mobile, fixed 200px from sm+ where flex-wrap has
+        // room to breathe.
+        compact ? 'w-full sm:min-w-[200px] sm:w-auto' : '',
+      )}
+    >
       <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
         {label}
       </span>
@@ -210,7 +221,7 @@ function Select({ label, value, onChange, options, compact }: SelectProps): JSX.
  */
 function LockedPill({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="grid min-w-[200px] gap-1">
+    <div className="grid w-full gap-1 sm:min-w-[200px] sm:w-auto">
       <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
         {label}
       </span>

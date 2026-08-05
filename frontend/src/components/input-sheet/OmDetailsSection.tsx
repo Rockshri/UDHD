@@ -9,6 +9,8 @@ import type { OmStatusOverride } from '../../types/api';
 interface Props {
   draft: ProjectDraft;
   setField: <K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) => void;
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
 const OM_STATUSES: OmStatusOverride[] = [
@@ -65,7 +67,7 @@ const STATUS_PAL: Record<OmStatusOverride, { bg: string; text: string; dot: stri
   'Handed Over to ULB': { bg: '#F0FDF4', text: '#15803D', dot: '#22C55E' },
 };
 
-export function OmDetailsSection({ draft, setField }: Props): JSX.Element {
+export function OmDetailsSection({ draft, setField, num = '06' }: Props): JSX.Element {
   const isCompleted = draft.status === 'Completed';
   const omInfo = useMemo(() => computeOmInfo(draft), [draft]);
   const effectiveStatus: OmStatusOverride | null =
@@ -75,7 +77,7 @@ export function OmDetailsSection({ draft, setField }: Props): JSX.Element {
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="06"
+          num={num}
           title="O&M (Operations & Maintenance)"
           sub="Applicable only to Completed projects — pre-fill anyway; alerts fire once status is Completed"
         />

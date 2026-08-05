@@ -145,8 +145,12 @@ export async function listProjects(
                                     WHERE ${division.regionId} = ${q.regionId})`
     : undefined;
 
+  // NIT_addition_instructions.md §5 — the Projects Register search box also
+  // matches on nit_number so users can look up a project by its tender reference.
   const searchClause = q.search
-    ? sql`(${project.projectName} ILIKE ${'%' + q.search + '%'} OR ${project.projectId} = ${q.search})`
+    ? sql`(${project.projectName} ILIKE ${'%' + q.search + '%'}
+           OR ${project.projectId} = ${q.search}
+           OR ${project.nitNumber} ILIKE ${'%' + q.search + '%'})`
     : undefined;
 
   const schemeJoin = q.schemeId
@@ -396,6 +400,13 @@ export async function updateProject(
     // transitions before writing.
     reconcileTenderStageOnUpdate(pre, patch);
 
+    // NIT_addition_instructions.md §4 — NIT Number / NIT Date are editable
+    // only via the dedicated PATCH /:id/nit endpoint (which enforces the
+    // sub-stage rule). Silently strip them from the generic update path
+    // so a stray Input Sheet payload doesn't bypass the stage guard.
+    if ('nitNumber' in patch) delete (patch as Record<string, unknown>).nitNumber;
+    if ('nitDate' in patch) delete (patch as Record<string, unknown>).nitDate;
+
     let updated: Project = pre;
     if (patchKeys.length > 0) {
       const [next] = await tx
@@ -631,6 +642,8 @@ export async function transferTenderSubStage(
         divisionId: project.divisionId,
         projectStageV2: project.projectStageV2,
         tenderSubStage: project.tenderSubStage,
+        nitNumber: project.nitNumber,
+        nitDate: project.nitDate,
       })
       .from(project)
       .where(inArray(project.projectId, input.projectIds));
@@ -676,6 +689,17 @@ export async function transferTenderSubStage(
         });
         continue;
       }
+      // NIT gating (NIT_addition_instructions.md §2) — moving forward out of
+      // NIT Published requires both NIT Number and NIT Date. Backward moves
+      // don't need this since we're going upstream, not committing.
+      if (step > 0 && current === 'NIT Published' && (!row.nitNumber || !row.nitDate)) {
+        result.skipped.push({
+          projectId: row.projectId,
+          reason:
+            'Please enter both NIT Number and NIT Date before transferring the project to the next Tender stage.',
+        });
+        continue;
+      }
       const to = tenderSubStages[nextIdx] as TenderSubStage;
       await tx
         .update(project)
@@ -702,4 +726,80 @@ export async function transferTenderSubStage(
   });
 
   return result;
+}
+
+/* ============================================================
+ * NIT DETAILS (NIT_addition_instructions.md)
+ * ============================================================ */
+
+export const updateProjectNitSchema = z.object({
+  nitNumber: z.string().min(1).max(80).nullable(),
+  nitDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
+    .nullable(),
+});
+export type UpdateProjectNitInput = z.infer<typeof updateProjectNitSchema>;
+
+/**
+ * NIT Number + NIT Date editor (Tender Dashboard → NIT Published rows).
+ *
+ * Enforced rules (§1, §2, §4 of the spec):
+ *   - Project must be in the Tender stage AND at the NIT Published sub-stage.
+ *   - Both fields may be cleared back to NULL — the transfer service checks
+ *     for non-null values before allowing a step forward.
+ *   - Standard PD division scoping.
+ *
+ * Audit-logged just like a normal update.
+ */
+export async function updateProjectNit(
+  projectId: string,
+  input: UpdateProjectNitInput,
+  actor: AuditActor,
+  pdDivisionId: number | null = null,
+): Promise<ProjectDetail> {
+  const post = await db.transaction(async (tx) => {
+    const [pre] = await tx
+      .select()
+      .from(project)
+      .where(eq(project.projectId, projectId))
+      .limit(1);
+    if (!pre) {
+      throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
+    }
+    if (pdDivisionId !== null && pre.divisionId !== pdDivisionId) {
+      throw new HttpError(404, 'PROJECT_NOT_FOUND', `Project ${projectId} does not exist`);
+    }
+    if (pre.projectStageV2 !== 'Tender' || pre.tenderSubStage !== 'NIT Published') {
+      throw new HttpError(
+        400,
+        'NIT_STAGE_REQUIRED',
+        'NIT details can only be edited while the project is at the NIT Published sub-stage.',
+      );
+    }
+
+    const [updated] = await tx
+      .update(project)
+      .set({ nitNumber: input.nitNumber, nitDate: input.nitDate })
+      .where(eq(project.projectId, projectId))
+      .returning();
+    if (!updated) throw new Error('project update did not return a row');
+
+    const changes = diffProject(
+      { nitNumber: pre.nitNumber, nitDate: pre.nitDate },
+      { nitNumber: updated.nitNumber, nitDate: updated.nitDate },
+    );
+    if (changes.length > 0) {
+      await recordAudit(tx, {
+        actor,
+        action: 'Updated',
+        projectId,
+        projectNameSnapshot: updated.projectName,
+        changes,
+      });
+    }
+    return updated;
+  });
+
+  return getProject(post.projectId);
 }

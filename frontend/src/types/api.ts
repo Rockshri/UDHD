@@ -354,6 +354,10 @@ export interface ProjectListItem {
   projectStageV2: ProjectStageV2 | null;
   /** Tender workflow sub-stage; non-null only when projectStageV2 === 'Tender'. */
   tenderSubStage: TenderSubStage | null;
+  /** NIT reference number; editable only from Tender Dashboard's NIT Published sub-stage. */
+  nitNumber: string | null;
+  /** NIT publication date (YYYY-MM-DD); pairs with nitNumber. */
+  nitDate: string | null;
   contractType: ContractType | null;
   /** @deprecated Soft-removed in Phase A; still returned for legacy round-trip. */
   workType: WorkType | null;

@@ -36,6 +36,8 @@ export const PROJECT_LABELS: Record<string, string> = {
   status: 'Execution status',
   projectStageV2: 'Project stage',
   tenderSubStage: 'Tender sub-stage',
+  nitNumber: 'NIT number',
+  nitDate: 'NIT date',
   plannedEndDate: 'Planned end date',
   revisedEndDate: 'Revised end date',
   delayReason: 'Delay reason',

@@ -19,6 +19,8 @@ import {
   tenderTransferSchema,
   transferTenderSubStage,
   updateProject,
+  updateProjectNit,
+  updateProjectNitSchema,
 } from '../services/projectsService.js';
 import { cosEotRouter } from './cosEot.js';
 import { geoPhotosRouter } from './geoPhotos.js';
@@ -130,6 +132,22 @@ projectsRouter.patch('/:projectId', requireProjectUpdate, async (req, res, next)
     const { projectId } = projectIdParam.parse(req.params);
     const body = updateProjectSchema.parse(req.body);
     const out = await updateProject(projectId, body, actorFromReq(req), sessionDivisionId(req));
+    res.json(out);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * NIT_addition_instructions.md §1/§4 — dedicated NIT editor. Guarded by
+ * requireProjectUpdate and further validated in the service (project must
+ * be at Tender / NIT Published sub-stage).
+ */
+projectsRouter.patch('/:projectId/nit', requireProjectUpdate, async (req, res, next) => {
+  try {
+    const { projectId } = projectIdParam.parse(req.params);
+    const body = updateProjectNitSchema.parse(req.body);
+    const out = await updateProjectNit(projectId, body, actorFromReq(req), sessionDivisionId(req));
     res.json(out);
   } catch (err) {
     next(err);

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { ChevronDown, LogOut, Menu } from 'lucide-react';
 import { useLogoutMutation } from '../../app/api/authApi';
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
@@ -12,7 +12,6 @@ import { cn } from '../../lib/utils';
 import type { UserRole } from '../../types/api';
 import { RoleGate } from '../auth/RoleGate';
 import { BuidcoLogo } from './BuidcoLogo';
-import { KpiGuideDrawer } from './KpiGuideDrawer';
 import { NavClock } from './NavClock';
 
 /** Full-form role labels for the header user pill (PD_role.md §2/§3). */
@@ -26,8 +25,8 @@ const ROLE_DISPLAY: Record<UserRole, string> = {
 /**
  * The 10 primary-nav items moved into the left sidebar per Read.md §1.
  * TopNav now only carries the utility pills (Input Sheet / MoM / O&M),
- * MD-only chips (Audit Trail / Users / MD Briefing), KPI Guide, clock,
- * and user pill — per user's chosen scoping.
+ * MD-only chips (Audit Trail / MD Briefing), KPI Guide, clock,
+ * and user profile dropdown.
  */
 interface NavItem {
   to: string;
@@ -55,9 +54,12 @@ const utilityLinkClass = ({ isActive }: { isActive: boolean }): string =>
 interface TopNavProps {
   /** Opens the mobile sidebar drawer (< lg only). */
   onOpenMobileNav: () => void;
+  /** Opens the KPI Guide drawer — state lives in AppShell so the mobile
+   *  Sidebar drawer can trigger it too. */
+  onOpenKpiGuide: () => void;
 }
 
-export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
+export function TopNav({ onOpenMobileNav, onOpenKpiGuide }: TopNavProps): JSX.Element {
   // Lookups powers the division-name label for PD pills. Query is cheap
   // (cached 1h in RTK Query) and skipped for non-authenticated sessions.
   const { data: lookups } = useGetLookupsQuery();
@@ -65,7 +67,6 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
   const dispatch = useAppDispatch();
   const [logout, { isLoading: loggingOut }] = useLogoutMutation();
   const navigate = useNavigate();
-  const [kpiOpen, setKpiOpen] = useState(false);
 
   const onSignOut = async (): Promise<void> => {
     try {
@@ -78,8 +79,10 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#E5E7EB] bg-white shadow-[0_1px_5px_rgba(0,0,0,0.07)]">
-      {/* Row 1 — hamburger (mobile) · brand · utility tabs · audit · user pill */}
-      <div className="mx-auto flex h-[50px] items-center gap-2 px-4">
+      {/* Row 1 — hamburger (mobile) · brand · utility tabs · audit · user pill.
+          Below `lg` (< 1024px) the utility pills move into the sidebar drawer
+          to keep this bar from overflowing on tablets and small laptops. */}
+      <div className="mx-auto flex h-[50px] items-center gap-2 px-3 sm:px-4">
         <button
           type="button"
           onClick={onOpenMobileNav}
@@ -88,9 +91,9 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
         >
           <Menu size={20} />
         </button>
-        <div className="flex flex-shrink-0 items-center gap-2 border-r border-[#E5E7EB] pr-3">
+        <div className="flex flex-shrink-0 items-center gap-2 border-r border-[#E5E7EB] pr-2 sm:pr-3">
           <BuidcoLogo size={32} />
-          <div>
+          <div className="hidden sm:block">
             <div className="text-[13px] font-extrabold leading-tight tracking-wide text-[#111827]">
               BUIDCO
             </div>
@@ -100,7 +103,10 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
           </div>
         </div>
 
-        <nav className="ml-auto flex flex-shrink-0 items-center gap-1.5" aria-label="Utility navigation">
+        <nav
+          className="ml-auto hidden flex-shrink-0 items-center gap-1.5 lg:flex"
+          aria-label="Utility navigation"
+        >
           {UTILITY_NAV_BEFORE_MOM.map((item) => (
             <NavLink key={item.to} to={item.to} className={utilityLinkClass}>
               {item.icon && <span className="text-[13px]" aria-hidden>{item.icon}</span>}
@@ -125,29 +131,30 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
           ))}
         </nav>
 
-        <div className="flex flex-shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex flex-shrink-0 items-center gap-1.5 lg:ml-0">
           <button
             type="button"
-            onClick={() => setKpiOpen(true)}
+            onClick={onOpenKpiGuide}
             className={cn(
-              'inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-[#374151] transition-colors hover:bg-[#F9FAFB]',
+              'hidden lg:inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-[#374151] transition-colors hover:bg-[#F9FAFB]',
             )}
             aria-label="Open KPI reference guide"
           >
             <span aria-hidden>❓</span> KPI Guide
           </button>
           <RoleGate allow={['MD']}>
-            <NavLink to="/audit" className={utilityLinkClass}>
+            <NavLink to="/audit" className={({ isActive }) => cn(utilityLinkClass({ isActive }), 'hidden lg:inline-flex')}>
               <span aria-hidden>🕒</span> Audit Trail
             </NavLink>
           </RoleGate>
-          <RoleGate allow={['MD', 'Admin']}>
-            <NavLink to="/users" className={utilityLinkClass}>
-              <span aria-hidden>👥</span> Users
-            </NavLink>
-          </RoleGate>
+          {/* '👥 Users' chip removed — User Management now lives in the left
+              sidebar (MD/Admin only). */}
 
-          <NavClock />
+          {/* Clock hides on the smallest screens (< sm, <640px) where the pill
+              would push the UserPill off-screen. */}
+          <div className="hidden sm:block">
+            <NavClock />
+          </div>
 
           <UserPill
             user={user}
@@ -163,21 +170,23 @@ export function TopNav({ onOpenMobileNav }: TopNavProps): JSX.Element {
         </div>
       </div>
 
-      {/* Primary navigation lives in the left sidebar (Read.md §1). */}
-
-      <KpiGuideDrawer open={kpiOpen} onClose={() => setKpiOpen(false)} />
+      {/* Primary navigation lives in the left sidebar (Read.md §1).
+          KpiGuideDrawer is rendered from AppShell so both TopNav and Sidebar
+          can trigger it via `onOpenKpiGuide`. */}
     </header>
   );
 }
 
 /**
- * Header user pill (PD_role.md §2/§3).
+ * Header user pill — trigger + dropdown menu (PD_role.md §2/§3).
  *
- *   All roles → Username · Role
- *   PDs      → Username · Role · Division (matches the JWT's session division;
- *              updates automatically if the divisionId in Redux changes)
+ * Trigger (always visible in header): 🟢 online dot · display name · chevron.
+ * Menu (opens on click): full profile block (Name, Role, Division for PDs,
+ * Username) + Sign out button.
  *
- * Kept as a small local component so TopNav's JSX stays legible.
+ * Clicking outside the menu, pressing Escape, or clicking any menu item
+ * closes it. The trigger has aria-expanded so screen readers announce it as
+ * a disclosure button.
  */
 function UserPill({
   user, divisionName, loggingOut, onSignOut,
@@ -189,42 +198,145 @@ function UserPill({
 }): JSX.Element {
   const displayName = user?.fullName || user?.username || '—';
   const roleLabel = user ? (ROLE_DISPLAY[user.role] ?? user.role) : '—';
-  // Full descriptor for the tooltip so truncation doesn't hide data.
-  const fullDescriptor = [displayName, roleLabel, divisionName]
-    .filter(Boolean)
-    .join(' · ');
-  // Compact single-row pill: dot · Name · role/division · sign-out.
-  // Fits within the 50px header without vertical overflow.
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Close on outside click + Escape. One combined effect so we can register
+  // both listeners atomically for the duration the menu is open.
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent): void => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const handleSignOut = async (): Promise<void> => {
+    setOpen(false);
+    await onSignOut();
+  };
+
   return (
-    <div
-      className="flex h-8 items-center gap-2 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white pl-2.5 pr-1"
-      title={fullDescriptor}
-    >
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22C55E]" aria-hidden />
-      <div className="flex min-w-0 items-baseline gap-1.5">
-        <span className="max-w-[110px] truncate text-[11.5px] font-bold text-[#111827]">
-          {displayName}
-        </span>
-        <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-          {roleLabel}
-        </span>
-        {divisionName ? (
-          <>
-            <span aria-hidden className="text-[9.5px] leading-none text-[#D1D5DB]">·</span>
-            <span className="max-w-[90px] truncate text-[9.5px] font-semibold uppercase tracking-wider text-[#6D28D9]">
-              {divisionName}
-            </span>
-          </>
-        ) : null}
-      </div>
+    <div ref={rootRef} className="relative">
+      {/* Trigger — compact: green dot + display name + chevron */}
       <button
         type="button"
-        onClick={onSignOut}
-        disabled={loggingOut}
-        className="ml-1 shrink-0 cursor-pointer rounded border border-transparent bg-white px-2 py-1 text-[10.5px] font-medium text-[#6B7280] transition-colors hover:border-[#FCA5A5] hover:bg-[#FEF2F2] hover:text-[#B91C1C] disabled:opacity-60"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={cn(
+          'flex h-8 items-center gap-2 rounded-lg border bg-white pl-2.5 pr-1.5 transition-colors',
+          open
+            ? 'border-[#1E3A5F] shadow-sm'
+            : 'border-[#E5E7EB] hover:border-[#D1D5DB] hover:bg-[#F9FAFB]',
+        )}
       >
-        {loggingOut ? 'Signing out…' : 'Sign out'}
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22C55E]"
+          aria-hidden
+          title="Online"
+        />
+        <span className="max-w-[140px] truncate text-[11.5px] font-bold text-[#111827]">
+          {displayName}
+        </span>
+        <ChevronDown
+          size={13}
+          aria-hidden
+          className={cn(
+            'shrink-0 text-[#6B7280] transition-transform',
+            open ? 'rotate-180' : '',
+          )}
+        />
       </button>
+
+      {/* Menu */}
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Account menu"
+          className="absolute right-0 top-full z-50 mt-1.5 w-[240px] overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-xl"
+        >
+          {/* Profile block */}
+          <div className="border-b border-[#F3F4F6] px-3 py-3">
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1E3A5F] text-[13px] font-bold text-white"
+              >
+                {getInitials(displayName)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-bold text-[#111827]">{displayName}</p>
+                <p className="mt-0.5 flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#6B7280]">
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-[#22C55E]"
+                    aria-hidden
+                  />
+                  Online
+                </p>
+              </div>
+            </div>
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[11.5px]">
+              <dt className="font-semibold uppercase tracking-wider text-[#6B7280]">Role</dt>
+              <dd className="truncate text-[#111827]">{roleLabel}</dd>
+              {divisionName ? (
+                <>
+                  <dt className="font-semibold uppercase tracking-wider text-[#6B7280]">
+                    Division
+                  </dt>
+                  <dd className="truncate font-semibold text-[#6D28D9]">{divisionName}</dd>
+                </>
+              ) : null}
+              {user?.username && user.username !== displayName ? (
+                <>
+                  <dt className="font-semibold uppercase tracking-wider text-[#6B7280]">
+                    Username
+                  </dt>
+                  <dd className="truncate text-[#374151]">{user.username}</dd>
+                </>
+              ) : null}
+            </dl>
+          </div>
+
+          {/* Actions */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleSignOut}
+            disabled={loggingOut}
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[12px] font-medium text-[#B91C1C] transition-colors hover:bg-[#FEF2F2] disabled:opacity-60"
+          >
+            <LogOut size={14} aria-hidden />
+            {loggingOut ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+/**
+ * Two-letter initials from the display name for the account-menu avatar.
+ * "Sarah Khan" → "SK"; "shri" → "SH"; falls back to "?" for empty strings.
+ */
+function getInitials(name: string): string {
+  const clean = name.trim();
+  if (!clean || clean === '—') return '?';
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return (parts[0] ?? '').slice(0, 2).toUpperCase() || '?';
+  }
+  const first = parts[0]?.[0] ?? '';
+  const last = parts[parts.length - 1]?.[0] ?? '';
+  return (first + last).toUpperCase() || '?';
 }

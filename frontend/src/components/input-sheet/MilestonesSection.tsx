@@ -13,6 +13,8 @@ import type { MilestoneItem } from '../../types/api';
 
 interface Props {
   projectId: string | null;
+  /** Override the default section number (used by the ALL Fields tab). */
+  num?: string;
 }
 
 interface DraftMilestone {
@@ -47,7 +49,7 @@ function currentMonthISO(): string {
   return `${yyyy}-${mm}-01`;
 }
 
-export function MilestonesSection({ projectId }: Props): JSX.Element {
+export function MilestonesSection({ projectId, num = '07' }: Props): JSX.Element {
   const { data, isLoading } = useListMilestonesQuery(projectId ?? '', { skip: !projectId });
   const [replaceMilestones, replaceState] = useReplaceMilestonesMutation();
   const [upsertProgress, upsertState] = useUpsertMonthlyProgressMutation();
@@ -74,7 +76,7 @@ export function MilestonesSection({ projectId }: Props): JSX.Element {
       <Card>
         <CardContent className="pt-4">
           <FormSectionHeader
-            num="07"
+            num={num}
             title="Milestones & Monthly Progress"
             sub="Milestone-weighted effective % — available after saving the project."
           />
@@ -174,7 +176,7 @@ export function MilestonesSection({ projectId }: Props): JSX.Element {
     <Card>
       <CardContent className="pt-4">
         <FormSectionHeader
-          num="07"
+          num={num}
           title="Milestones & Monthly Progress"
           sub="Weights must sum to 100 (Postgres trigger enforces this atomically at commit)"
           right={

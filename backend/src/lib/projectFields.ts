@@ -84,6 +84,14 @@ export const createProjectSchema = z.object({
    * the same shared schema.
    */
   tenderSubStage: z.enum(tenderSubStages).nullable().optional(),
+  /**
+   * NIT Number + NIT Date — accepted on the main upsert only for the
+   * initial Tender creation flow. The Tender Dashboard's inline editor
+   * uses the dedicated PATCH /projects/:id/nit endpoint which enforces
+   * the sub-stage rule; edits from other paths are blocked server-side.
+   */
+  nitNumber: stringField(80),
+  nitDate: dateField(),
   plannedEndDate: dateField(),
   revisedEndDate: dateField(),
   delayReason: textField(),
