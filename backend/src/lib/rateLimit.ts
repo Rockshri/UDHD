@@ -54,3 +54,24 @@ export const refreshLimiter = build('rl:auth:refresh', Ratelimit.slidingWindow(2
 
 /** 20 uploads per minute, per user. Wired in Phase 4 when uploads land. */
 export const uploadLimiter = build('rl:upload', Ratelimit.slidingWindow(20, '1 m'));
+
+/**
+ * Forgot-password rate limits. Keyed by username (not IP) except the
+ * lookup step, same reasoning as loginLimiter — one account's budget
+ * shouldn't lock out others on the same network.
+ */
+
+/** 10 identity lookups per 15 min, per IP — bounds /request-password-reset spam. */
+export const passwordResetLookupLimiter = build('rl:auth:pwreset-lookup', Ratelimit.slidingWindow(10, '15 m'));
+
+/** 1 OTP send per 45s, per user+channel — the "resend cooldown". */
+export const otpSendCooldownLimiter = build('rl:auth:otp-cooldown', Ratelimit.slidingWindow(1, '45 s'));
+
+/** 5 OTP sends per 15 min, per user — bounds OTP-generation abuse. */
+export const otpSendLimiter = build('rl:auth:otp-send', Ratelimit.slidingWindow(5, '15 m'));
+
+/** 10 verify attempts per 15 min, per user — defense in depth on top of the per-OTP attempts counter. */
+export const otpVerifyLimiter = build('rl:auth:otp-verify', Ratelimit.slidingWindow(10, '15 m'));
+
+/** 3 password-reset requests per hour, per user — bounds request-spam/approver-email-flooding. */
+export const passwordResetRequestLimiter = build('rl:auth:pwreset-request', Ratelimit.slidingWindow(3, '1 h'));

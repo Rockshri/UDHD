@@ -10,8 +10,18 @@ import { PriorityBadge } from '../projects/PriorityBadge';
 import { ProgressBar } from '../projects/ProgressBar';
 import { StatusBadge } from '../projects/StatusBadge';
 import type { Lookups, ProjectDetail, ProjectListItem } from '../../types/api';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import { cn } from '../../lib/utils';
 import { formatCurrencyCr, formatDate, formatPercent } from '../../lib/formatters';
+import { downloadProjectPdf, downloadProjectPptx } from '../../lib/mdProjectExport';
+import {
+  ALL_PROJECT_KEYS,
+  PROJECT_FIELD_GROUPS,
+  PROJECT_FIELD_ORDER,
+  DEFAULT_PROJECT_VIS,
+  type ProjectFieldKey,
+} from '../../lib/mdProjectFields';
+import type { LookupCtx } from '../projects/ProjectsTable';
 
 // ── Status filter options (mirrors projectStatuses enum on the backend) ─────
 const STATUS_OPTIONS = ['Not Started', 'In Progress', 'Completed', 'On Hold', 'Delayed'] as const;
@@ -126,128 +136,8 @@ const DEFAULT_COL_VIS = Object.fromEntries(
 ) as Record<ColKey, boolean>;
 
 // ── Project-detail field catalog (per Enhance MD Portfolio Briefing spec §3) ─
-// The 12 CORE fields are rendered in this exact order at the top when visible.
-// Additional fields render below in group order.
-type ProjectFieldKey =
-  // Core (default ON) — order matters
-  | 'nameOfWork' | 'agreementNumber' | 'agreementDate' | 'agreementAmount'
-  | 'expectedCompletion' | 'physicalProgress' | 'financialProgress' | 'expenditureTillDate'
-  | 'geotagPhotographs' | 'issuesRemarks' | 'agencyContractor' | 'pdName'
-  // Extras (default OFF)
-  | 'city' | 'district' | 'division' | 'region' | 'sector' | 'schemes' | 'projectStageV2' | 'contractType'
-  | 'status' | 'priority'
-  | 'sponsoringDept' | 'implementingAgency' | 'sanctionDate'
-  | 'plannedEndDate' | 'revisedEndDate' | 'scheduledProgressPct'
-  | 'delayReason' | 'deptStuckAt'
-  | 'aaAmount' | 'revisedAaAmount' | 'contractValueCr'
-  | 'mobAdvanceIssuedCr' | 'mobAdvanceRecoveredCr' | 'advanceOutstandingCr' | 'retentionMoneyHeldCr'
-  | 'totalPaymentsCr' | 'lastPaymentDate' | 'lastRaBillNo'
-  | 'pbgNumber' | 'pbgAmountCr' | 'pbgIssuingBank' | 'pbgExpiryDate'
-  | 'emdAmountCr' | 'emdRefNumber' | 'emdDate'
-  | 'omStartDate' | 'omEndDate' | 'omPeriodMonths' | 'omAgency' | 'omRemarks'
-  | 'projectBrief' | 'mainComponentScope';
-
-interface ProjectFieldDef { key: ProjectFieldKey; label: string; defaultOn: boolean }
-interface ProjectFieldGroup { group: string; fields: ProjectFieldDef[] }
-
-const PROJECT_FIELD_GROUPS: ProjectFieldGroup[] = [
-  {
-    group: 'Core',
-    fields: [
-      { key: 'nameOfWork',          label: 'Name of Work',                defaultOn: true },
-      { key: 'agreementNumber',     label: 'Agreement Number',            defaultOn: true },
-      { key: 'agreementDate',       label: 'Agreement Date',              defaultOn: true },
-      { key: 'agreementAmount',     label: 'Agreement Amount',            defaultOn: true },
-      { key: 'expectedCompletion',  label: 'Expected Date of Completion', defaultOn: true },
-      { key: 'physicalProgress',    label: 'Physical Progress',           defaultOn: true },
-      { key: 'financialProgress',   label: 'Financial Progress',          defaultOn: true },
-      { key: 'expenditureTillDate', label: 'Expenditure Till Date',       defaultOn: true },
-      { key: 'geotagPhotographs',   label: 'Geotag Photographs',          defaultOn: true },
-      { key: 'issuesRemarks',       label: 'Issues and Remarks',          defaultOn: true },
-      { key: 'agencyContractor',    label: 'Name of Agency / Contractor', defaultOn: true },
-      { key: 'pdName',              label: 'Name of PD',                  defaultOn: true },
-    ],
-  },
-  {
-    group: 'Classification',
-    fields: [
-      { key: 'city',           label: 'City',           defaultOn: false },
-      { key: 'district',       label: 'District',       defaultOn: false },
-      { key: 'division',       label: 'Division',       defaultOn: false },
-      { key: 'region',         label: 'Region',         defaultOn: false },
-      { key: 'sector',         label: 'Sector',         defaultOn: false },
-      { key: 'schemes',        label: 'Scheme(s)',      defaultOn: false },
-      { key: 'projectStageV2', label: 'Project Stage',    defaultOn: false },
-      { key: 'contractType',   label: 'Contract Type',    defaultOn: false },
-      { key: 'status',         label: 'Execution Status', defaultOn: false },
-      { key: 'priority',       label: 'Priority',         defaultOn: false },
-    ],
-  },
-  {
-    group: 'Sponsoring & Dates',
-    fields: [
-      { key: 'sponsoringDept',       label: 'Sponsoring Department', defaultOn: false },
-      { key: 'implementingAgency',   label: 'Implementing Agency',   defaultOn: false },
-      { key: 'sanctionDate',         label: 'Sanction Date',         defaultOn: false },
-      { key: 'plannedEndDate',       label: 'Planned End Date',      defaultOn: false },
-      { key: 'revisedEndDate',       label: 'Revised End Date',      defaultOn: false },
-      { key: 'scheduledProgressPct', label: 'Scheduled Progress %',  defaultOn: false },
-      { key: 'delayReason',          label: 'Delay Reason',          defaultOn: false },
-      { key: 'deptStuckAt',          label: 'Department Stuck At',   defaultOn: false },
-    ],
-  },
-  {
-    group: 'Contract & Financial',
-    fields: [
-      { key: 'aaAmount',              label: 'AA Amount',             defaultOn: false },
-      { key: 'revisedAaAmount',       label: 'Revised AA Amount',     defaultOn: false },
-      { key: 'contractValueCr',       label: 'Contract Value',        defaultOn: false },
-      { key: 'mobAdvanceIssuedCr',    label: 'Mob. Advance Issued',   defaultOn: false },
-      { key: 'mobAdvanceRecoveredCr', label: 'Mob. Advance Recovered', defaultOn: false },
-      { key: 'advanceOutstandingCr',  label: 'Advance Outstanding',   defaultOn: false },
-      { key: 'retentionMoneyHeldCr',  label: 'Retention Held',        defaultOn: false },
-      { key: 'totalPaymentsCr',       label: 'Total Payments',        defaultOn: false },
-      { key: 'lastPaymentDate',       label: 'Last Payment Date',     defaultOn: false },
-      { key: 'lastRaBillNo',          label: 'Last RA Bill No.',       defaultOn: false },
-    ],
-  },
-  {
-    group: 'Security & Guarantees',
-    fields: [
-      { key: 'pbgNumber',      label: 'PBG Number',       defaultOn: false },
-      { key: 'pbgAmountCr',    label: 'PBG Amount',       defaultOn: false },
-      { key: 'pbgIssuingBank', label: 'PBG Issuing Bank', defaultOn: false },
-      { key: 'pbgExpiryDate',  label: 'PBG Expiry Date',  defaultOn: false },
-      { key: 'emdAmountCr',    label: 'EMD Amount',       defaultOn: false },
-      { key: 'emdRefNumber',   label: 'EMD Reference',    defaultOn: false },
-      { key: 'emdDate',        label: 'EMD Date',         defaultOn: false },
-    ],
-  },
-  {
-    group: 'O&M',
-    fields: [
-      { key: 'omStartDate',    label: 'O&M Start Date',      defaultOn: false },
-      { key: 'omEndDate',      label: 'O&M End Date',        defaultOn: false },
-      { key: 'omPeriodMonths', label: 'O&M Period (months)', defaultOn: false },
-      { key: 'omAgency',       label: 'O&M Agency',          defaultOn: false },
-      { key: 'omRemarks',      label: 'O&M Remarks',         defaultOn: false },
-    ],
-  },
-  {
-    group: 'Notes',
-    fields: [
-      { key: 'projectBrief',       label: 'Project Brief',          defaultOn: false },
-      { key: 'mainComponentScope', label: 'Main Component / Scope', defaultOn: false },
-    ],
-  },
-];
-
-const ALL_PROJECT_KEYS = PROJECT_FIELD_GROUPS.flatMap((g) => g.fields.map((f) => f.key));
-const DEFAULT_PROJECT_VIS = Object.fromEntries(
-  PROJECT_FIELD_GROUPS.flatMap((g) => g.fields.map((f) => [f.key, f.defaultOn])),
-) as Record<ProjectFieldKey, boolean>;
-/** Fixed render order: 12 core fields as specified, then extras in group order. */
-const PROJECT_FIELD_ORDER: ProjectFieldKey[] = ALL_PROJECT_KEYS;
+// Moved to lib/mdProjectFields.ts so the PDF/PPTX export module can share it
+// without importing this component (would create a circular import).
 
 // ── localStorage helpers (buidco_md_popup_*_v1 per spec §7) ──────────────────
 const LS_KPI_KEY  = 'buidco_md_popup_left_fields_v1';
@@ -303,9 +193,14 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     loadVis(LS_PROJ_KEY, DEFAULT_PROJECT_VIS),
   );
   const [leftPct, setLeftPct] = useState<number>(() => loadDividerPct());
+  const [showMdExportMenu, setShowMdExportMenu] = useState(false);
+  const [mdExporting, setMdExporting]           = useState<'pdf' | 'pptx' | null>(null);
+  const [mdExportError, setMdExportError]       = useState<string | null>(null);
   const bodyRef  = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const mdExportMenuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(mdExportMenuRef, showMdExportMenu, () => setShowMdExportMenu(false));
 
   // Project list — server-filtered by the 4 filter dropdowns. Fetches
   // whenever the modal is open (no more "select a scheme first" gate). Limit
@@ -448,6 +343,32 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     }
     return m;
   }, [lookupsQuery.data]);
+
+  // Export the active project's currently-ticked fields as PDF/PowerPoint.
+  // Waits for the full ProjectDetail fetch so extras-only fields (agreement
+  // number, sponsoring dept, etc.) aren't exported blank while still loading.
+  const runMdExport = async (format: 'pdf' | 'pptx'): Promise<void> => {
+    if (!activeProject) return;
+    setShowMdExportMenu(false);
+    setMdExportError(null);
+    setMdExporting(format);
+    try {
+      const visibleKeys = PROJECT_FIELD_ORDER.filter((k) => projVis[k]);
+      const ctx: LookupCtx = {
+        districtById: districtsById,
+        divisionById: divisionsById,
+        sectorById: sectorsById,
+        schemeById: schemesById,
+      };
+      const asDetail = projectDetailQuery.data ?? null;
+      if (format === 'pdf') await downloadProjectPdf(visibleKeys, activeProject, asDetail, ctx);
+      else await downloadProjectPptx(visibleKeys, activeProject, asDetail, ctx);
+    } catch {
+      setMdExportError('Export failed. Please try again.');
+    } finally {
+      setMdExporting(null);
+    }
+  };
 
   // Sort projects: High priority first, then Delayed first, then nearest expected date
   const sortedProjects = useMemo(() => {
@@ -649,6 +570,9 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                   : hasAnyFilter
                     ? `Portfolio KPIs · Filtered${hitCap ? ' (top 100)' : ''}`
                     : 'Portfolio KPIs · All Projects'}
+                {activeProject && mdExportError ? (
+                  <span className="ml-2 normal-case text-[#B91C1C]">{mdExportError}</span>
+                ) : null}
               </span>
               <div className="flex shrink-0 items-center gap-1.5">
                 {activeProject ? (
@@ -660,6 +584,38 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                     >
                       ← Back to KPIs
                     </button>
+                    <div className="relative" ref={mdExportMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowMdExportMenu((v) => !v)}
+                        title="Download the selected project's ticked fields"
+                        aria-expanded={showMdExportMenu}
+                        disabled={mdExporting !== null || projectDetailQuery.isLoading}
+                        className="rounded-md border border-[#D1D5DB] bg-white px-2 py-1 text-[10.5px] font-semibold text-[#374151] hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {mdExporting
+                          ? `Exporting ${mdExporting === 'pdf' ? 'PDF' : 'PowerPoint'}…`
+                          : '⬇ Download'}
+                      </button>
+                      {showMdExportMenu ? (
+                        <div className="absolute left-0 top-full z-30 mt-1 w-40 rounded-lg border border-[#E5E7EB] bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => void runMdExport('pdf')}
+                            className="block w-full rounded px-2 py-1.5 text-left text-xs text-[#374151] hover:bg-[#F3F4F6]"
+                          >
+                            PDF (.pdf)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void runMdExport('pptx')}
+                            className="block w-full rounded px-2 py-1.5 text-left text-xs text-[#374151] hover:bg-[#F3F4F6]"
+                          >
+                            PowerPoint (.pptx)
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setOpenPicker(openPicker === 'proj' ? null : 'proj')}

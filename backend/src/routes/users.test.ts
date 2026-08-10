@@ -83,12 +83,8 @@ describe('DELETE /api/users/:userId — auth gating', () => {
     expect(mockedDelete).not.toHaveBeenCalled();
   });
 
-  it('403 FORBIDDEN when a PD attempts to delete (PD is not a writer)', async () => {
-    // PD tokens still need a divisionId for requireAuth to accept them,
-    // but requireWriter runs before divisionId matters here — actually
-    // requireAuth checks divisionId first, so PD without divisionId 401s.
-    // Sign token WITH divisionId so we get past requireAuth to hit
-    // requireWriter and prove the role gate blocks PDs.
+  it('200 + delegates to service.deleteUser when a PD deletes a valid target (PD may delete Viewers)', async () => {
+    // PD tokens need a divisionId for requireAuth to accept them.
     mockedGetUserById.mockResolvedValueOnce({ ...baseUser, role: 'PD' });
     const { token } = signAccessToken({
       sub: '42',
@@ -96,12 +92,17 @@ describe('DELETE /api/users/:userId — auth gating', () => {
       name: 'x',
       divisionId: 1,
     });
-    const res = await request(app)
+    mockedDelete.mockResolvedValueOnce(undefined);
+
+    await request(app)
       .delete('/api/users/99')
       .set('Authorization', `Bearer ${token}`)
-      .expect(403);
-    expect(res.body.error.code).toBe('FORBIDDEN');
-    expect(mockedDelete).not.toHaveBeenCalled();
+      .expect(204);
+
+    expect(mockedDelete).toHaveBeenCalledWith(
+      99,
+      expect.objectContaining({ userId: 42, role: 'PD' }),
+    );
   });
 });
 
@@ -116,16 +117,16 @@ describe('DELETE /api/users/:userId — validation + delegation', () => {
     expect(mockedDelete).not.toHaveBeenCalled();
   });
 
-  it('200 + delegates to service.deleteUser when MD deletes a valid target', async () => {
+  it('204 + delegates to service.deleteUser when MD deletes a valid target', async () => {
     mockedGetUserById.mockResolvedValueOnce({ ...baseUser, role: 'MD' });
-    mockedDelete.mockResolvedValueOnce({ userId: 77 });
+    mockedDelete.mockResolvedValueOnce(undefined);
 
     const res = await request(app)
       .delete('/api/users/77')
       .set('Authorization', bearer(42, 'MD'))
-      .expect(200);
+      .expect(204);
 
-    expect(res.body).toEqual({ userId: 77 });
+    expect(res.body).toEqual({});
     expect(mockedDelete).toHaveBeenCalledTimes(1);
     // (userId, actor) — actor.userId=42, role=MD
     expect(mockedDelete).toHaveBeenCalledWith(
@@ -134,16 +135,16 @@ describe('DELETE /api/users/:userId — validation + delegation', () => {
     );
   });
 
-  it('200 when an Admin deletes a Viewer/PD (service allows)', async () => {
+  it('204 when an Admin deletes a Viewer/PD (service allows)', async () => {
     mockedGetUserById.mockResolvedValueOnce({ ...baseUser, role: 'Admin' });
-    mockedDelete.mockResolvedValueOnce({ userId: 55 });
+    mockedDelete.mockResolvedValueOnce(undefined);
 
     const res = await request(app)
       .delete('/api/users/55')
       .set('Authorization', bearer(42, 'Admin'))
-      .expect(200);
+      .expect(204);
 
-    expect(res.body).toEqual({ userId: 55 });
+    expect(res.body).toEqual({});
     expect(mockedDelete).toHaveBeenCalledWith(
       55,
       expect.objectContaining({ userId: 42, role: 'Admin' }),

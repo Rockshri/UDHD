@@ -189,6 +189,20 @@ export const APP_USER_LABELS: Record<string, string> = {
   divisions: 'Assigned divisions',
   createdBy: 'Created by',
   userId: 'User ID',
+  email: 'Email',
+  mobileNumber: 'Mobile number',
+  table: 'Table',
+};
+
+export const PASSWORD_RESET_REQUEST_LABELS: Record<string, string> = {
+  requestId: 'Request ID',
+  userId: 'Requesting user ID',
+  role: 'Requester role',
+  channel: 'OTP channel',
+  status: 'Status',
+  approverId: 'Approver ID',
+  approverRole: 'Approver role',
+  decisionNote: 'Decision note',
   table: 'Table',
 };
 
@@ -203,3 +217,5 @@ export const diffMomAction = (b: Row, a: Row): AuditChange[] => diffFields(b, a,
 export const diffPreMonsoon = (b: Row, a: Row): AuditChange[] => diffFields(b, a, PRE_MONSOON_LABELS);
 export const diffGeoPhoto = (b: Row, a: Row): AuditChange[] => diffFields(b, a, GEO_PHOTO_LABELS);
 export const diffAppUser = (b: Row, a: Row): AuditChange[] => diffFields(b, a, APP_USER_LABELS);
+export const diffPasswordResetRequest = (b: Row, a: Row): AuditChange[] =>
+  diffFields(b, a, PASSWORD_RESET_REQUEST_LABELS);

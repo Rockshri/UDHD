@@ -23,6 +23,11 @@ vi.mock('../lib/rateLimit.ts', async () => {
     loginLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
     refreshLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
     uploadLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
+    passwordResetLookupLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
+    passwordResetRequestLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
+    otpSendCooldownLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
+    otpSendLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
+    otpVerifyLimiter: async () => ({ success: true, remaining: Infinity, reset: Date.now() }),
   };
 });
 

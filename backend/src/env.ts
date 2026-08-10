@@ -40,6 +40,14 @@ const envSchema = z.object({
   UPLOADTHING_TOKEN: z.string().min(1).optional().or(z.literal('').transform(() => undefined)),
 
   COOKIE_DOMAIN: z.string().min(1).optional().or(z.literal('').transform(() => undefined)),
+
+  // SMTP — forgot-password email OTP delivery. Optional/graceful like Upstash
+  // above: unset in dev falls back to logging the OTP instead of emailing it.
+  SMTP_HOST: z.string().min(1).optional().or(z.literal('').transform(() => undefined)),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().min(1).optional().or(z.literal('').transform(() => undefined)),
+  SMTP_PASS: z.string().min(1).optional().or(z.literal('').transform(() => undefined)),
+  SMTP_FROM: z.string().min(1).optional().or(z.literal('').transform(() => undefined)),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -57,3 +65,4 @@ export const env: Env = parsed.data;
 
 export const isProduction = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';
+

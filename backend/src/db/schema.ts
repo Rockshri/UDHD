@@ -381,6 +381,10 @@ export const appUser = pgTable('app_user', {
   createdBy: integer('created_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   lastLogin: timestamp('last_login', { withTimezone: true }),
+  /** Forgot-password OTP delivery target (Task 4/0009). Nullable — not every existing user has one on file yet. */
+  email: varchar('email', { length: 120 }),
+  /** Forgot-password OTP delivery target (Task 4/0009). Nullable — not every existing user has one on file yet. */
+  mobileNumber: varchar('mobile_number', { length: 15 }),
 });
 
 /** PD ↔ Division assignment (Phase C1 §3). */
@@ -457,6 +461,73 @@ export const refreshToken = pgTable(
 );
 
 /* ============================================================
+ * PASSWORD RESET OTP (0009_password_reset.sql)
+ * ============================================================ */
+
+export const passwordResetOtp = pgTable(
+  'password_reset_otp',
+  {
+    otpId: serial('otp_id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.userId, { onDelete: 'cascade' }),
+    /** 'email' | 'mobile' */
+    channel: varchar('channel', { length: 10 }).notNull(),
+    otpHash: text('otp_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    /** Populated only after successful OTP verification — see lib/otp.ts. */
+    resetTokenHash: text('reset_token_hash'),
+    resetTokenExpiresAt: timestamp('reset_token_expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+    userAgent: text('user_agent'),
+    ipAddress: text('ip_address'),
+  },
+  (t) => ({
+    userIdx: index('idx_password_reset_otp_user').on(t.userId),
+  }),
+);
+
+/* ============================================================
+ * PASSWORD RESET REQUESTS (0010_password_reset_requests.sql)
+ *
+ * Admin/PD/Viewer submit a request here instead of self-serving an OTP;
+ * an authorised higher role must approve it (see lib/roleHierarchy.ts).
+ * The DB-level partial unique index that enforces "one active request
+ * per user" lives only in the SQL migration (not mirrored here — see
+ * the file header note on CHECK constraints/triggers/views).
+ * ============================================================ */
+
+export const passwordResetRequest = pgTable(
+  'password_reset_request',
+  {
+    requestId: serial('request_id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.userId, { onDelete: 'cascade' }),
+    /** Snapshot of the requester's role at submission time. */
+    role: varchar('role', { length: 10 }).notNull(),
+    /** 'email' | 'mobile' — chosen by the requester at submission time. */
+    channel: varchar('channel', { length: 10 }).notNull(),
+    /** 'Pending' | 'Approved' | 'Rejected' | 'Completed' */
+    status: varchar('status', { length: 10 }).notNull().default('Pending'),
+    requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().default(sql`now()`),
+    approverId: integer('approver_id').references(() => appUser.userId),
+    approverRole: varchar('approver_role', { length: 10 }),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decisionNote: text('decision_note'),
+    /** Set when the requester actually completes the password reset. */
+    fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
+    userAgent: text('user_agent'),
+    ipAddress: text('ip_address'),
+  },
+  (t) => ({
+    userIdx: index('idx_password_reset_request_user').on(t.userId),
+  }),
+);
+
+/* ============================================================
  * TYPE EXPORTS
  * ============================================================ */
 
@@ -506,3 +577,6 @@ export type AuditLogChangeInsert = typeof auditLogChange.$inferInsert;
 
 export type RefreshToken = typeof refreshToken.$inferSelect;
 export type RefreshTokenInsert = typeof refreshToken.$inferInsert;
+
+export type PasswordResetRequest = typeof passwordResetRequest.$inferSelect;
+export type PasswordResetRequestInsert = typeof passwordResetRequest.$inferInsert;

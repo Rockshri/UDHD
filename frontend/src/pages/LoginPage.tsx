@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useLoginMutation } from '../app/api/authApi';
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated } from '../features/auth/authSlice';
+import buidcoPic from '../assets/BUIDCo_pic.jpg';
 import { Button } from '../components/ui/button';
-import { BuidcoLogo } from '../components/layout/BuidcoLogo';
 import { Input } from '../components/ui/input';
+import { inputClassName, primaryButtonClassName, secondaryButtonClassName } from './authFormStyles';
 
 interface LocationState {
   from?: { pathname: string };
@@ -64,83 +65,57 @@ export function LoginPage(): JSX.Element {
   const errorMessage = extractErrorMessage(error);
 
   return (
-    <div className="min-h-screen w-full bg-[#F4F6F9] lg:grid lg:grid-cols-[1.05fr_1fr]">
-      {/* ── Left: brand panel (desktop) / compact top band (mobile) ── */}
-      <aside
-        className="relative overflow-hidden bg-gradient-to-br from-[#0F2440] via-[#1E3A5F] to-[#2C5282] px-6 py-8 text-white lg:flex lg:min-h-screen lg:flex-col lg:justify-between lg:px-12 lg:py-12"
-      >
-        {/* Decorative blobs — pointer-events-none so they never intercept clicks */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-24 -right-20 h-72 w-72 rounded-full bg-white/5 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-[#3B82F6]/20 blur-3xl"
-        />
-
-        {/* Mobile: compact brand row (logo + name only). Desktop: full block. */}
-        <div className="relative flex items-center gap-3 lg:block">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/95 p-2 shadow-lg ring-1 ring-white/40 lg:h-24 lg:w-24 lg:p-3">
-            <BuidcoLogo size={80} />
-          </div>
-          <div className="lg:mt-6">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60 lg:text-[11px]">
-              Government of Bihar
-            </p>
-            <h1 className="mt-0.5 text-lg font-extrabold leading-tight lg:mt-2 lg:text-3xl">
-              BUIDCO
-            </h1>
-            <p className="text-[11px] font-medium leading-snug text-white/80 lg:mt-1 lg:text-sm">
-              Bihar Urban Infrastructure Development Corporation
-            </p>
-          </div>
-        </div>
-
-        {/* Desktop-only mid section: tagline + feature bullets */}
-        <div className="relative mt-10 hidden lg:block">
-          <h2 className="max-w-md text-2xl font-bold leading-snug text-white">
-            Project Monitoring System
-          </h2>
-          <p className="mt-3 max-w-md text-sm leading-relaxed text-white/75">
-            A unified workspace for tracking every urban infrastructure
-            project — from tender through completion — across Bihar's
-            divisions.
-          </p>
-
-          <ul className="mt-8 space-y-3 text-sm text-white/85">
-            <FeatureBullet>Real-time project & tender workflow</FeatureBullet>
-            <FeatureBullet>Division-scoped access for Project Directors</FeatureBullet>
-            <FeatureBullet>Audit-trailed inputs & role-based controls</FeatureBullet>
-          </ul>
-        </div>
-
-        {/* Desktop-only footer */}
-        <p className="relative mt-8 hidden text-[11px] text-white/50 lg:block">
-          © {new Date().getFullYear()} BUIDCO · Government of Bihar
-        </p>
-      </aside>
-
-      {/* ── Right: sign-in form ── */}
-      <section className="flex items-center justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
-        <div className="w-full max-w-md">
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-[0_4px_24px_rgba(15,36,64,0.08)] sm:p-8">
-            <header className="mb-5">
-              <h2 className="text-xl font-bold text-[#111827] sm:text-2xl">
-                {pdDivisions ? 'Choose your division' : 'Welcome back'}
-              </h2>
-              <p className="mt-1 text-[13px] text-[#6B7280]">
-                {pdDivisions
-                  ? 'Pick the division you\'ll be working in for this session.'
-                  : 'Sign in to continue to the monitoring dashboard.'}
+    <div className="flex min-h-screen items-center justify-center bg-[#EEF1F6] p-4 sm:p-6 lg:p-10">
+      <div className="grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-2xl bg-white shadow-2xl lg:grid-cols-[46%_54%]">
+        {/* ── Left branding panel ── */}
+        <div className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#0B1C33] via-[#152C4D] to-[#1D4ED8] px-8 py-10 text-center sm:py-14 lg:py-12">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)',
+              backgroundSize: '20px 20px',
+            }}
+          />
+          <div className="relative z-10 flex flex-col items-center gap-6">
+            <div className="h-44 w-36 overflow-hidden rounded-2xl bg-white shadow-lg sm:h-52 sm:w-[172px]">
+              <img
+                src={buidcoPic}
+                alt="BUIDCO — Building Better Tomorrow"
+                className="h-full w-full object-cover"
+                style={{ objectPosition: 'center 22%' }}
+              />
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-wide text-white sm:text-3xl">
+                BUIDCO
+              </h1>
+              <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#93C5FD]">
+                Project Monitoring System
               </p>
-            </header>
+            </div>
+            <p className="max-w-xs text-sm leading-relaxed text-[#CBD5E1]">
+              A unified command center for tracking every BUIDCO project —
+              from sanction to completion.
+            </p>
+          </div>
+        </div>
 
-            <form className="space-y-4" onSubmit={onSubmit}>
+        {/* ── Right authentication panel ── */}
+        <div className="flex flex-col justify-center bg-white px-6 py-10 sm:px-10 sm:py-12 lg:px-14">
+          <div className="mx-auto w-full max-w-sm">
+            <h2 className="text-2xl font-extrabold text-[#111827] sm:text-3xl">
+              Welcome to BUIDCo Portal
+            </h2>
+            <p className="mt-2 text-sm text-[#6B7280]">
+              Sign in with your credentials to access the project dashboard.
+            </p>
+
+            <form className="mt-8 space-y-4" onSubmit={onSubmit}>
               {pdDivisions ? (
                 // ── Step 2 — PD division picker ──
                 <>
-                  <div className="rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2.5 text-[12px] text-[#1E3A5F]">
+                  <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-[12px] text-[#1E3A5F]">
                     <p className="font-semibold">Signed in as {username}</p>
                     <p className="mt-0.5 text-[11.5px] text-[#374151]">
                       You're a Project Director. Choose which division you're
@@ -153,7 +128,7 @@ export function LoginPage(): JSX.Element {
                       required
                       value={selectedDivisionId ?? ''}
                       onChange={(e) => setSelectedDivisionId(Number(e.target.value))}
-                      className="h-10 w-full rounded-md border border-[#D1D5DB] bg-white px-3 text-sm text-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A5F] focus-visible:ring-offset-1"
+                      className="h-11 w-full rounded-xl border border-[#D1D5DB] bg-white px-4 text-sm text-[#111827] transition-all duration-200 focus-visible:border-[#1D4ED8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1D4ED8]/15"
                     >
                       {pdDivisions.map((d) => (
                         <option key={d.divisionId} value={d.divisionId}>
@@ -164,7 +139,7 @@ export function LoginPage(): JSX.Element {
                   </label>
                   {errorMessage ? (
                     <p
-                      className="rounded-md border border-[#FCA5A5] bg-[#FEF2F2] px-3 py-2 text-xs font-medium text-[#B91C1C]"
+                      className="rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] px-4 py-2.5 text-xs font-medium text-[#B91C1C]"
                       role="alert"
                     >
                       {errorMessage}
@@ -173,7 +148,7 @@ export function LoginPage(): JSX.Element {
                   <div className="flex items-center gap-2 pt-1">
                     <Button
                       type="submit"
-                      className="flex-1"
+                      className={`flex-1 ${primaryButtonClassName}`}
                       disabled={isLoading || selectedDivisionId === null}
                     >
                       {isLoading ? 'Signing in…' : 'Continue'}
@@ -183,6 +158,7 @@ export function LoginPage(): JSX.Element {
                       variant="outline"
                       onClick={restartLogin}
                       disabled={isLoading}
+                      className={secondaryButtonClassName}
                     >
                       ← Back
                     </Button>
@@ -198,8 +174,7 @@ export function LoginPage(): JSX.Element {
                       required
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="e.g. shri"
-                      className="h-10"
+                      className={inputClassName}
                     />
                   </label>
                   <label className="grid gap-1.5 text-xs font-semibold text-[#374151]">
@@ -210,12 +185,12 @@ export function LoginPage(): JSX.Element {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-10"
+                      className={inputClassName}
                     />
                   </label>
                   {errorMessage ? (
                     <p
-                      className="rounded-md border border-[#FCA5A5] bg-[#FEF2F2] px-3 py-2 text-xs font-medium text-[#B91C1C]"
+                      className="rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] px-4 py-2.5 text-xs font-medium text-[#B91C1C]"
                       role="alert"
                     >
                       {errorMessage}
@@ -223,35 +198,24 @@ export function LoginPage(): JSX.Element {
                   ) : null}
                   <Button
                     type="submit"
-                    className="h-10 w-full text-sm font-semibold"
+                    className={`w-full ${primaryButtonClassName}`}
                     disabled={isLoading}
                   >
                     {isLoading ? 'Signing in…' : 'Sign in'}
                   </Button>
+                  <Link
+                    to="/forgot-password"
+                    className="block text-center text-[12.5px] font-semibold text-[#1D4ED8] hover:underline"
+                  >
+                    Forgot Password?
+                  </Link>
                 </>
               )}
             </form>
           </div>
-
-          {/* Mobile-only footer (desktop shows it in the brand panel) */}
-          <p className="mt-6 text-center text-[11px] text-[#6B7280] lg:hidden">
-            © {new Date().getFullYear()} BUIDCO · Government of Bihar
-          </p>
         </div>
-      </section>
+      </div>
     </div>
-  );
-}
-
-function FeatureBullet({ children }: { children: React.ReactNode }): JSX.Element {
-  return (
-    <li className="flex items-start gap-2.5">
-      <span
-        aria-hidden
-        className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[#60A5FA]"
-      />
-      <span>{children}</span>
-    </li>
   );
 }
 

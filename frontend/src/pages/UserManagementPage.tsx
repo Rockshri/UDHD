@@ -25,6 +25,14 @@ const ROLE_TONE: Record<UserRole, string> = {
   Viewer: 'bg-[#F9FAFB] text-[#6B7280] border-[#E5E7EB]',
 };
 
+/** Deletion hierarchy (Task 2) — mirrors backend's DELETABLE_ROLES in usersService.ts; the backend is the real authorization boundary, this only drives button visibility. */
+const DELETABLE_ROLES: Record<UserRole, UserRole[]> = {
+  MD: ['Admin', 'PD', 'Viewer'],
+  Admin: ['PD', 'Viewer'],
+  PD: ['Viewer'],
+  Viewer: [],
+};
+
 export function UserManagementPage(): JSX.Element {
   const me = useAppSelector(selectCurrentUser);
   const { data, isLoading } = useListUsersQuery();
@@ -38,6 +46,14 @@ export function UserManagementPage(): JSX.Element {
   const [deleting, setDeleting] = useState<UserRow | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const busy = createState.isLoading || updateState.isLoading || deleteState.isLoading;
+
+  // Opens the typed-confirmation modal below rather than deleting directly —
+  // shared entry point for both the row action button and the edit form's
+  // delete button.
+  const onDeleteUser = (target: UserRow): void => {
+    setDeleteError(null);
+    setDeleting(target);
+  };
 
   const canPromote = me?.role === 'MD';
   // MD sees every role; Admin can create Viewer and PD.
@@ -54,7 +70,7 @@ export function UserManagementPage(): JSX.Element {
 
   return (
     <RoleGate
-      allow={['MD', 'Admin']}
+      allow={['MD', 'Admin', 'PD']}
       fallback={
         <div className="rounded-lg border border-[#FCA5A5] bg-[#FEF2F2] p-4 text-sm">
           <p className="font-semibold text-[#B91C1C]">
@@ -73,12 +89,16 @@ export function UserManagementPage(): JSX.Element {
             <p className="text-[12.5px] text-[#6B7280]">
               {me?.role === 'MD'
                 ? 'Full control: create any role, toggle project CRUD flags, assign PD divisions, deactivate.'
-                : 'Admin scope: create/edit Viewer and Project Director accounts. Assign divisions and configure project permissions.'}
+                : me?.role === 'Admin'
+                  ? 'Admin scope: create/edit Viewer and Project Director accounts. Assign divisions and configure project permissions.'
+                  : 'PD scope: view and delete Viewer accounts.'}
             </p>
           </div>
-          <Button onClick={() => setAddOpen((o) => !o)} disabled={busy}>
-            {addOpen ? '× Close form' : `+ Add ${canPromote ? 'User' : 'Viewer'}`}
-          </Button>
+          {me?.role !== 'PD' ? (
+            <Button onClick={() => setAddOpen((o) => !o)} disabled={busy}>
+              {addOpen ? '× Close form' : `+ Add ${canPromote ? 'User' : 'Viewer'}`}
+            </Button>
+          ) : null}
         </header>
 
         {addOpen ? (
@@ -126,14 +146,9 @@ export function UserManagementPage(): JSX.Element {
                         me?.role === 'MD'
                         || (me?.role === 'Admin' && (u.role === 'Viewer' || u.role === 'PD'));
                       const isSelf = me?.userId === u.userId;
-                      // Delete policy (mirrors backend usersService.deleteUser):
-                      //   MD    → any user except themselves
-                      //   Admin → PD/Viewer only, never themselves
-                      const canDelete =
-                        !isSelf && (
-                          me?.role === 'MD'
-                          || (me?.role === 'Admin' && (u.role === 'Viewer' || u.role === 'PD'))
-                        );
+                      // Delete policy mirrors backend's DELETABLE_ROLES hierarchy
+                      // (usersService.ts) — MD→Admin/PD/Viewer, Admin→PD/Viewer, PD→Viewer.
+                      const canDelete = !isSelf && (me ? DELETABLE_ROLES[me.role].includes(u.role) : false);
                       const createdByLabel = u.createdBy
                         ? usersById.get(u.createdBy)?.username ?? `#${u.createdBy}`
                         : '—';
@@ -228,10 +243,7 @@ export function UserManagementPage(): JSX.Element {
                                   <Button
                                     size="xs"
                                     variant="destructive"
-                                    onClick={() => {
-                                      setDeleteError(null);
-                                      setDeleting(u);
-                                    }}
+                                    onClick={() => onDeleteUser(u)}
                                     disabled={busy}
                                     title={`Delete ${u.username}`}
                                   >
@@ -262,6 +274,8 @@ export function UserManagementPage(): JSX.Element {
             busy={busy}
             isSelf={me?.userId === editing.userId}
             divisionsCatalog={lookups?.divisions ?? []}
+            canDeleteUser={me ? DELETABLE_ROLES[me.role].includes(editing.role) : false}
+            onDeleteUser={() => onDeleteUser(editing)}
             onCancel={() => setEditing(null)}
             onSubmit={async (payload) => {
               await updateUser({ userId: editing.userId, body: payload as UpdateUserPayload }).unwrap();
@@ -443,6 +457,8 @@ interface FormPayload {
   canDeleteProjects?: boolean;
   canViewProjects?: boolean;
   divisions?: number[];
+  email?: string | null;
+  mobileNumber?: string | null;
 }
 
 interface UserFormProps {
@@ -453,6 +469,9 @@ interface UserFormProps {
   busy: boolean;
   isSelf?: boolean;
   divisionsCatalog: Array<{ divisionId: number; divisionName: string; regionId: number }>;
+  /** Whether the current actor may delete this row, per the role hierarchy (edit mode only). */
+  canDeleteUser?: boolean;
+  onDeleteUser?: () => void;
   onCancel: () => void;
   onSubmit: (payload: FormPayload) => Promise<void>;
 }
@@ -465,6 +484,8 @@ function UserForm({
   busy,
   isSelf,
   divisionsCatalog,
+  canDeleteUser,
+  onDeleteUser,
   onCancel,
   onSubmit,
 }: UserFormProps): JSX.Element {
@@ -478,6 +499,8 @@ function UserForm({
   const [canDelete, setCanDelete] = useState<boolean>(initial?.canDeleteProjects ?? false);
   const [canView,   setCanView]   = useState<boolean>(initial?.canViewProjects ?? true);
   const [divisions, setDivisions] = useState<number[]>(initial?.divisions ?? []);
+  const [email, setEmail] = useState(initial?.email ?? '');
+  const [mobileNumber, setMobileNumber] = useState(initial?.mobileNumber ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const canEditRole = mode === 'create' ? true : canPromote && !isSelf;
@@ -507,6 +530,8 @@ function UserForm({
       canUpdateProjects: canUpdate,
       canDeleteProjects: canDelete,
       canViewProjects:   canView,
+      email: email.trim() || null,
+      mobileNumber: mobileNumber.trim() || null,
     };
     if (mode === 'create') {
       payload.username = username.trim();
@@ -565,6 +590,18 @@ function UserForm({
           </div>
         )}
         <FormField label="Full name" value={fullName} onChange={setFullName} />
+        <FormField
+          label="Email"
+          value={email}
+          onChange={setEmail}
+          hint="Used for Forgot Password OTP delivery."
+        />
+        <FormField
+          label="Mobile number"
+          value={mobileNumber}
+          onChange={setMobileNumber}
+          hint="Used for Forgot Password OTP delivery (SMS not yet wired up)."
+        />
         <FormField
           label={mode === 'create' ? 'Password' : 'New password (blank = unchanged)'}
           value={password}
@@ -703,6 +740,11 @@ function UserForm({
         <Button variant="outline" onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
+        {mode === 'edit' && canDeleteUser && onDeleteUser ? (
+          <Button variant="destructive" onClick={onDeleteUser} disabled={busy} className="ml-auto">
+            Delete user
+          </Button>
+        ) : null}
       </div>
     </div>
   );
