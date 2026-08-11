@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { FormField } from './FormField';
 import { FormSectionHeader } from './FormSectionHeader';
-import { isTenderCompleted } from '../../features/tender/tenderWorkflow';
 import type { ProjectDraft } from '../../hooks/useProjectDraft';
 import type { CosEotItem } from '../../types/api';
 import type { ProjectStageV2, ProjectStatus } from '../../types/api';
@@ -71,33 +70,14 @@ function computeDelay(
 }
 
 export function PhaseDatesSection({ projectId: _projectId, draft, setField, cosItems, num = '01' }: Props): JSX.Element {
+  // Still needed for the delay computation + display (see computeDelay call
+  // below and the `renderDelay` helper) — completed projects have 0 delay.
   const isCompleted = draft.status === 'Completed';
-  // Tender_Dashboard.md §9 — Construction unlocks only after the project has
-  // been advanced through the Tender workflow to Work Order Issued. O&M
-  // stays gated until Construction has been picked AND marked Completed
-  // (Execution Status). Rows already at Construction/O&M keep the option
-  // available so their existing selection round-trips cleanly.
-  const tenderComplete = isTenderCompleted({
-    projectStageV2: draft.projectStageV2,
-    tenderSubStage: draft.tenderSubStage,
-  });
-  const constructionAllowed = tenderComplete || draft.projectStageV2 === 'Construction';
-  const omAllowed =
-    (constructionAllowed && isCompleted) || draft.projectStageV2 === 'O&M';
-  const stageOptions = PROJECT_STAGES_V2.map((s) => {
-    if (s === 'Construction' && !constructionAllowed) {
-      return { value: s, label: `${s} — locked until Tender complete`, disabled: true };
-    }
-    if (s === 'O&M' && !omAllowed) {
-      return { value: s, label: `${s} — locked until Construction complete`, disabled: true };
-    }
-    return { value: s, label: s };
-  });
-  const stageHint = !constructionAllowed
-    ? 'Construction unlocks after the Tender workflow reaches Work Order Issued.'
-    : !omAllowed
-      ? 'O&M unlocks once Construction is marked Completed (Execution Status).'
-      : undefined;
+  // Construction and O&M are always selectable — the previous tender-completion
+  // gate was removed per user request. Backend still records the stage as-is;
+  // no server-side enforcement of stage sequencing.
+  const stageOptions = PROJECT_STAGES_V2.map((s) => ({ value: s, label: s }));
+  const stageHint: string | undefined = undefined;
   // Only CoS rows flagged Time Linked = YES flow into the project schedule.
   // Rows with Time Linked = NO are independent bookkeeping and must not
   // shift Revised End Date or the delay math (Instruction §3).

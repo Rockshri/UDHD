@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
 import { Card, CardContent } from '../ui/card';
 import { FormField } from './FormField';
@@ -26,25 +25,18 @@ const CONTRACT_TYPES = ['Work Contract', 'Service Contract', 'O&M Contract', 'Ot
 export function BasicInfoSection({ draft, setField, readOnly = false, num = '01' }: Props): JSX.Element {
   const { data: lookups } = useGetLookupsQuery();
   const sectors = lookups?.sectors ?? [];
-  const districts = lookups?.districts ?? [];
   const schemes = lookups?.schemes ?? [];
   const regions = lookups?.regions ?? [];
   const divisions = lookups?.divisions ?? [];
 
-  // Division belongs to exactly one Region, so the Region picker filters the
-  // Division dropdown. Region isn't stored on the project — it's derived from
-  // whichever division is picked. We keep a local pickedRegionId so the user
-  // can filter without also committing a division yet, and it auto-syncs when
-  // the draft's divisionId changes (e.g. on edit-mode hydrate).
+  // Region is derived from Division: user picks a Division, we look up its
+  // regionId, and show the region name in a read-only field. Region is not
+  // a project column of its own (it lives on division.regionId), so there's
+  // nothing to persist here — display only.
   const selectedDivision = divisions.find((d) => d.divisionId === draft.divisionId);
-  const derivedRegionId = selectedDivision?.regionId ?? null;
-  const [pickedRegionId, setPickedRegionId] = useState<number | null>(derivedRegionId);
-  // When the draft's division changes (edit-mode load or explicit selection),
-  // snap the region filter to match so the dropdown reflects reality.
-  const effectiveRegionId = derivedRegionId ?? pickedRegionId;
-  const filteredDivisions = effectiveRegionId
-    ? divisions.filter((d) => d.regionId === effectiveRegionId)
-    : divisions;
+  const derivedRegion = selectedDivision
+    ? regions.find((r) => r.regionId === selectedDivision.regionId) ?? null
+    : null;
 
   return (
     <Card>
@@ -67,70 +59,25 @@ export function BasicInfoSection({ draft, setField, readOnly = false, num = '01'
             options={sectors.map((s) => ({ value: String(s.sectorId), label: s.sectorName }))}
             disabled={readOnly}
           />
-          <FormField
-            label="City"
-            value={draft.city}
-            onChange={(v) => setField('city', v || null)}
-            disabled={readOnly}
-          />
-          <FormField
-            label="District"
-            type="select"
-            value={draft.districtId === null ? '' : String(draft.districtId)}
-            onChange={(v) => setField('districtId', v ? Number(v) : null)}
-            options={districts.map((d) => ({ value: String(d.districtId), label: d.districtName }))}
-            disabled={readOnly}
-          />
-          <FormField
-            label="Region"
-            type="select"
-            value={effectiveRegionId === null ? '' : String(effectiveRegionId)}
-            onChange={(v) => {
-              const next = v ? Number(v) : null;
-              setPickedRegionId(next);
-              // If the currently-selected division doesn't belong to the newly
-              // picked region, clear it so the user picks a valid one.
-              if (
-                next !== null && selectedDivision && selectedDivision.regionId !== next
-              ) {
-                setField('divisionId', null);
-              }
-            }}
-            options={regions.map((r) => ({
-              value: String(r.regionId),
-              label: r.regionName,
-            }))}
-            hint={
-              derivedRegionId !== null
-                ? '↳ auto-derived from selected Division'
-                : 'Filters the Division list'
-            }
-            disabled={readOnly}
-          />
+          {/* Division first — Region is auto-derived from division.regionId. */}
           <FormField
             label="Division"
             type="select"
             value={draft.divisionId === null ? '' : String(draft.divisionId)}
-            onChange={(v) => {
-              const next = v ? Number(v) : null;
-              setField('divisionId', next);
-              // Auto-sync Region so the label matches even if the user hadn't
-              // touched the Region picker yet.
-              if (next !== null) {
-                const d = divisions.find((x) => x.divisionId === next);
-                if (d) setPickedRegionId(d.regionId);
-              }
-            }}
-            options={filteredDivisions.map((d) => ({
+            onChange={(v) => setField('divisionId', v ? Number(v) : null)}
+            options={divisions.map((d) => ({
               value: String(d.divisionId),
               label: d.divisionName,
             }))}
-            hint={
-              effectiveRegionId === null
-                ? 'Showing all divisions — pick a Region to narrow'
-                : `Showing ${filteredDivisions.length} division(s) in this region`
-            }
             disabled={readOnly}
+          />
+          <FormField
+            label="Region"
+            value={derivedRegion?.regionName ?? ''}
+            onChange={() => { /* read-only, auto-derived from Division */ }}
+            placeholder="Select a Division"
+            hint="↳ auto-derived from selected Division"
+            disabled
           />
           <FormField
             label="Contractor"

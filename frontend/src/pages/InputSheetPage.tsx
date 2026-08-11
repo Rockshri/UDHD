@@ -16,7 +16,6 @@ import { BasicInfoSection } from '../components/input-sheet/BasicInfoSection';
 import { ContractSecuritySection } from '../components/input-sheet/ContractSecuritySection';
 import { CosEotSection } from '../components/input-sheet/CosEotSection';
 import { GeoTaggingSection } from '../components/input-sheet/GeoTaggingSection';
-import { MilestonesSection } from '../components/input-sheet/MilestonesSection';
 import { OmDetailsSection } from '../components/input-sheet/OmDetailsSection';
 import { PhaseDatesSection } from '../components/input-sheet/PhaseDatesSection';
 import { ProgressFinancialSection } from '../components/input-sheet/ProgressFinancialSection';
@@ -33,8 +32,7 @@ type SectionId =
   | 'contract'
   | 'geo'
   | 'action'
-  | 'om'
-  | 'milestones';
+  | 'om';
 
 interface SectionDef {
   id: SectionId;
@@ -62,7 +60,6 @@ const VARIABLE_SECTIONS: SectionDef[] = [
   { id: 'geo', label: '04 GeoTagging' },
   { id: 'action', label: '05 Action & Remarks' },
   { id: 'om', label: '06 O&M Details' },
-  { id: 'milestones', label: '07 Milestones & Progress' },
 ];
 
 const FIXED_IDS = new Set<SectionId>(FIXED_SECTIONS.map((s) => s.id));
@@ -418,12 +415,6 @@ export function InputSheetPage(): JSX.Element {
               draft={draft}
               setField={setField}
               {...(activeGroup === 'all' ? { num: '08' } : {})}
-            />
-          ) : null}
-          {activeGroup === 'all' || section === 'milestones' ? (
-            <MilestonesSection
-              projectId={projectId ?? null}
-              {...(activeGroup === 'all' ? { num: '09' } : {})}
             />
           ) : null}
         </div>

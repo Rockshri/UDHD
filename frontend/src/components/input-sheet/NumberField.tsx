@@ -50,7 +50,14 @@ export function NumberField({
             const v = e.target.value;
             if (v === '') return onChange(null);
             const n = Number(v);
-            onChange(Number.isFinite(n) ? n : null);
+            if (!Number.isFinite(n)) return onChange(null);
+            // Hard-clamp to [min, max] when either is set — the native
+            // `min`/`max` attributes are only advisory, so paste + typing
+            // 150 into a 0-100 field would otherwise silently accept it.
+            let clamped = n;
+            if (typeof min === 'number' && clamped < min) clamped = min;
+            if (typeof max === 'number' && clamped > max) clamped = max;
+            onChange(clamped);
           }}
           placeholder={placeholder}
           required={required}

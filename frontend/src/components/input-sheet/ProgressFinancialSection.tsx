@@ -40,10 +40,27 @@ export function ProgressFinancialSection({ draft, setField, cosItems, num = '02'
           sub="Sanctioned Cost auto-fills from Revised AA (or AA). CoS totals derive from Section 04."
         />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {/* Money row 1: AA Amount → Revised AA Amount → Sanctioned Cost
+              (auto). Grouped together so the auto-computed sanctioned cost
+              sits immediately next to the inputs it derives from. */}
+          <NumberField
+            label="AA Amount"
+            suffix="₹ Cr"
+            value={draft.aaAmountCr}
+            onChange={(v) => setField('aaAmountCr', v)}
+          />
+          <NumberField
+            label="Revised AA Amount"
+            suffix="₹ Cr"
+            value={draft.revisedAaAmountCr}
+            onChange={(v) => setField('revisedAaAmountCr', v)}
+          />
           <ReadOnlyMetric
             label={`Sanctioned Cost (auto — ${sanctionedSource})`}
             value={sanctionedCost !== null ? `₹ ${sanctionedCost.toFixed(2)} Cr` : '—'}
           />
+
+          {/* Progress % row — all three % fields together for easy scanning. */}
           <NumberField
             label="Physical Progress % (Actual)"
             suffix="%"
@@ -68,20 +85,8 @@ export function ProgressFinancialSection({ draft, setField, cosItems, num = '02'
             value={draft.financialProgressPct}
             onChange={(v) => setField('financialProgressPct', v)}
           />
-          <ReadOnlyMetric label="Total CoS Count (auto)" value={String(cosItems.length)} />
-          <ReadOnlyMetric label="Total EoT Days (auto)" value={`${totalEotDays} d`} />
-          <NumberField
-            label="AA Amount"
-            suffix="₹ Cr"
-            value={draft.aaAmountCr}
-            onChange={(v) => setField('aaAmountCr', v)}
-          />
-          <NumberField
-            label="Revised AA Amount"
-            suffix="₹ Cr"
-            value={draft.revisedAaAmountCr}
-            onChange={(v) => setField('revisedAaAmountCr', v)}
-          />
+
+          {/* Remaining money + auto-computed CoS totals. */}
           <NumberField
             label="Agreement Amount"
             suffix="₹ Cr"
@@ -94,6 +99,8 @@ export function ProgressFinancialSection({ draft, setField, cosItems, num = '02'
             value={draft.financialProgressCr}
             onChange={(v) => setField('financialProgressCr', v)}
           />
+          <ReadOnlyMetric label="Total CoS Count (auto)" value={String(cosItems.length)} />
+          <ReadOnlyMetric label="Total EoT Days (auto)" value={`${totalEotDays} d`} />
         </div>
 
         <div className="mt-4 border-t border-[#F3F4F6] pt-3">
