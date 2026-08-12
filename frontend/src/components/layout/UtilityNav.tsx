@@ -7,8 +7,8 @@ import { RoleGate } from '../auth/RoleGate';
 /**
  * The 10 primary-nav items moved into the left sidebar per Read.md §1.
  * This cluster carries the utility pills (Input Sheet / MoM / O&M),
- * MD-only chips (Audit Trail / Users / MD Briefing), and the KPI Guide
- * trigger. Rendered by both TopNav (desktop row, `hidden lg:flex`) and
+ * role-gated chips (Audit Trail — MD/Admin; Users; MD Briefing — MD),
+ * and the KPI Guide trigger. Rendered by both TopNav (desktop row, `hidden lg:flex`) and
  * Sidebar (mobile drawer, `lg:hidden`) — single source of truth so the
  * two never drift apart.
  */
@@ -73,7 +73,7 @@ export function UtilityNavCluster({
       >
         <span aria-hidden>❓</span> KPI Guide
       </button>
-      <RoleGate allow={['MD']}>
+      <RoleGate allow={['MD', 'Admin']}>
         <NavLink to="/audit" className={utilityLinkClass} onClick={onNavigate}>
           <span aria-hidden>🕒</span> Audit Trail
         </NavLink>

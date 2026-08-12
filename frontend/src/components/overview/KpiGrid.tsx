@@ -62,7 +62,7 @@ export function KpiGrid({ data }: KpiGridProps): JSX.Element {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard
           label="Total AA"
           value={formatCurrencyCr(data?.totalAaCr)}
@@ -77,16 +77,9 @@ export function KpiGrid({ data }: KpiGridProps): JSX.Element {
           tone="info"
           icon="✍️"
         />
-        <StatCard
-          label="Total Financial"
-          value={formatCurrencyCr(data?.totalFinancialCr)}
-          hint="Utilised to date"
-          tone="success"
-          icon="💰"
-        />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard
           label="Avg Physical Progress"
           value={formatPercent(data?.avgPhysicalPct)}
@@ -100,13 +93,6 @@ export function KpiGrid({ data }: KpiGridProps): JSX.Element {
           hint="Average across all projects"
           tone="success"
           icon="📈"
-        />
-        <StatCard
-          label="Financial Utilisation"
-          value={formatPercent(data?.financialUtilisationPct)}
-          hint="Utilised ÷ Sanctioned"
-          tone="brand"
-          icon="📊"
         />
       </div>
     </section>

@@ -1,63 +1,81 @@
-### Task: End-to-End Project Check and Merge Conflict Resolution
+Task 1 — Analyze the Entire Project & Preserve Existing Functionality
 
-**First, analyze and check the entire project end-to-end** after merging `feature/bhaveshResponsive` into `projectTrack`. Identify and fix all errors, build issues, runtime issues, broken functionality, and unresolved merge conflicts without changing or breaking any existing functionality.
+First, analyze the complete project end-to-end before making any changes.
+Understand the existing structure, modules, data flow, UI behavior, filtering, sorting, permissions, and dependencies.
+Implement only the changes mentioned in the tasks below.
+Do not break, remove, or modify any existing functionality or project data.
+Preserve the existing design, layout, workflows, validations, permissions, and functionality.
+Make only the minimum necessary changes.
+After implementation, test all affected modules and verify that other modules/projects continue to work correctly.
 
-Specifically:
+Task 2 — Make Division Summary Blocks Clickable
 
-1. **Perform a complete end-to-end project analysis**
+Navigate to Left Side Panel → Division.
+The following four summary blocks are currently non-clickable:
+Divisions with Projects
+Total Projects
+Completed
+Delayed
+Make all four blocks clickable.
+When any block is clicked, display the relevant details/data below the summary blocks.
+Ensure the displayed details correspond correctly to the selected block.
+Preserve the existing sorting, project information, and other Division page functionality.
 
-   * Check the frontend, backend, APIs, routing, authentication, database integration, and existing features.
-   * Check the application for compile-time, runtime, build, and integration errors.
-   * Verify that all existing functionality from both `projectTrack` and `feature/bhaveshResponsive` is preserved.
-   * Do not unnecessarily modify existing code, architecture, UI, API structure, or functionality.
+Task 3 — Add Filter Functionality to Division Page
 
-2. **Resolve all Git merge conflicts**
+Navigate to Left Side Panel → Division.
+There are currently four sorting options:
+Sort: Total ↓
+Sort: Delayed ↓
+Sort: Completion % ↓
+Sort: A–Z
+Add a Filter button beside the existing sorting options.
+Implement complete filter functionality so users can filter the Division data based on the available relevant fields.
+Ensure filtering works together with the existing sorting functionality.
+Preserve the existing Division page layout and behavior.
 
-   * Search the entire project for unresolved Git conflict markers:
+Task 4 — Make Scheme Summary Blocks Clickable
 
-     * `<<<<<<< HEAD`
-     * `=======`
-     * `>>>>>>>`
-   * Remove and properly resolve every conflict.
-   * Do not blindly choose one branch's code. Analyze both versions and combine them correctly wherever both functionalities are required.
+Navigate to Left Side Panel → Schemes.
+The following five summary blocks are currently non-clickable:
+Schemes
+Projects
+Completed
+In Progress
+Delayed
+Make all five blocks clickable.
+When a block is clicked, display the corresponding details/data below the summary blocks.
+Ensure the displayed information accurately reflects the selected block.
+Preserve all existing Scheme page functionality, sorting, and project data.
 
-3. **Fix the current `usersApi.ts` error**
+Task 5 — Make Management Action Blocks Clickable & Add Filter
 
-   * Resolve the conflict in:
-     `frontend/src/app/api/usersApi.ts`
-   * Remove the unresolved conflict markers around the `deleteUser` functionality.
-   * Preserve the `deleteUser` functionality as well as all existing API functionality from both branches.
+Navigate to Left Side Panel → Management Action.
+The following four summary blocks are currently non-clickable:
+Projects
+Total Actions
+Open
+Closed
+Make all four blocks clickable.
+When a block is clicked, display the corresponding details below the summary blocks.
+When showing the project list/details, ensure the relevant projects are displayed correctly.
+Add a Filter button beside the existing sorting options.
+Implement the filter functionality for the Management Action project/action data.
+Ensure filtering works correctly with the existing sorting options.
+Preserve existing Management Action functionality and project information.
 
-4. **Check for additional merge-related errors**
+Task 6 — Update CoS/EoT Filters & Remove Existing Sort Buttons
 
-   * Search all frontend and backend files for unresolved conflicts or incomplete merges.
-   * Check TypeScript, JavaScript, React, API, configuration, and other relevant project files.
-   * Fix any errors caused by the merge.
-
-5. **Verify existing functionality**
-
-   * Verify the functionality from `projectTrack`.
-   * Verify the responsiveness changes from `feature/bhaveshResponsive`.
-   * Verify the download/export functionality and other features added in `feature/bhaveshResponsive`.
-   * Ensure authentication, RBAC, routing, APIs, and other existing features continue to work.
-
-6. **Build and run the complete application**
-
-   * Run the appropriate installation/build commands.
-   * Start the application and verify that the frontend and backend work correctly.
-   * Fix any errors found during the build or runtime testing.
-
-7. **Preserve existing functionality**
-
-   * **Do not remove, disable, replace, or change any existing functionality unless it is strictly required to resolve an error.**
-   * Do not change the existing UI/design unnecessarily.
-   * Do not change API contracts, database structure, routes, authentication, or RBAC behavior unnecessarily.
-   * Make the minimum necessary changes to fix the issues.
-
-8. **Final verification**
-
-   * Confirm there are no unresolved merge conflicts.
-   * Confirm the project builds successfully.
-   * Confirm the application runs successfully.
-   * Confirm both branches' required functionality is preserved.
-   * Only after successful verification, commit the resolved changes and push them to the `projectTrack` branch.
+Navigate to Left Side Panel → CoS/EoT.
+Currently, the page contains the following category/sorting buttons:
+All
+Scope Addition
+Scope Deletion
+Design Change
+Quantity Variation
+Others
+Remove these six existing buttons from the sorting section.
+Add a Filter button in their place.
+Implement proper filter functionality for the CoS/EoT records using the relevant available fields/categories.
+Ensure the filter can correctly narrow down the displayed CoS/EoT information.
+Preserve the existing CoS/EoT records, data, and other functionality.

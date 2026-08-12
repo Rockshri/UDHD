@@ -26,7 +26,6 @@ const CONTRACT_TYPES = ['Work Contract', 'Service Contract', 'O&M Contract', 'Ot
 export function BasicInfoSection({ draft, setField, readOnly = false, num = '01' }: Props): JSX.Element {
   const { data: lookups } = useGetLookupsQuery();
   const sectors = lookups?.sectors ?? [];
-  const districts = lookups?.districts ?? [];
   const schemes = lookups?.schemes ?? [];
   const regions = lookups?.regions ?? [];
   const divisions = lookups?.divisions ?? [];
@@ -74,11 +73,28 @@ export function BasicInfoSection({ draft, setField, readOnly = false, num = '01'
             disabled={readOnly}
           />
           <FormField
-            label="District"
+            label="Division"
             type="select"
-            value={draft.districtId === null ? '' : String(draft.districtId)}
-            onChange={(v) => setField('districtId', v ? Number(v) : null)}
-            options={districts.map((d) => ({ value: String(d.districtId), label: d.districtName }))}
+            value={draft.divisionId === null ? '' : String(draft.divisionId)}
+            onChange={(v) => {
+              const next = v ? Number(v) : null;
+              setField('divisionId', next);
+              // Auto-sync Region so the label matches even if the user hadn't
+              // touched the Region picker yet.
+              if (next !== null) {
+                const d = divisions.find((x) => x.divisionId === next);
+                if (d) setPickedRegionId(d.regionId);
+              }
+            }}
+            options={filteredDivisions.map((d) => ({
+              value: String(d.divisionId),
+              label: d.divisionName,
+            }))}
+            hint={
+              effectiveRegionId === null
+                ? 'Showing all divisions — pick a Region below to narrow'
+                : `Showing ${filteredDivisions.length} division(s) in this region`
+            }
             disabled={readOnly}
           />
           <FormField
@@ -102,35 +118,12 @@ export function BasicInfoSection({ draft, setField, readOnly = false, num = '01'
             }))}
             hint={
               derivedRegionId !== null
-                ? '↳ auto-derived from selected Division'
-                : 'Filters the Division list'
+                ? '🔒 Auto-selected from Division — clear Division above to change it'
+                : 'Optional — narrows the Division list above'
             }
-            disabled={readOnly}
-          />
-          <FormField
-            label="Division"
-            type="select"
-            value={draft.divisionId === null ? '' : String(draft.divisionId)}
-            onChange={(v) => {
-              const next = v ? Number(v) : null;
-              setField('divisionId', next);
-              // Auto-sync Region so the label matches even if the user hadn't
-              // touched the Region picker yet.
-              if (next !== null) {
-                const d = divisions.find((x) => x.divisionId === next);
-                if (d) setPickedRegionId(d.regionId);
-              }
-            }}
-            options={filteredDivisions.map((d) => ({
-              value: String(d.divisionId),
-              label: d.divisionName,
-            }))}
-            hint={
-              effectiveRegionId === null
-                ? 'Showing all divisions — pick a Region to narrow'
-                : `Showing ${filteredDivisions.length} division(s) in this region`
-            }
-            disabled={readOnly}
+            // Once a Division is picked, Region is derived from it and locked;
+            // it only becomes independently editable when no Division is set.
+            disabled={readOnly || derivedRegionId !== null}
           />
           <FormField
             label="Contractor"

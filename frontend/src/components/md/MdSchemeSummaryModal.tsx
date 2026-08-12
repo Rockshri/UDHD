@@ -14,6 +14,7 @@ import { useClickOutside } from '../../hooks/useClickOutside';
 import { cn } from '../../lib/utils';
 import { formatCurrencyCr, formatDate, formatPercent } from '../../lib/formatters';
 import { downloadProjectPdf, downloadProjectPptx } from '../../lib/mdProjectExport';
+import { RemarksButton, RemarksDialog } from '../projects/RemarksDialog';
 import {
   ALL_PROJECT_KEYS,
   PROJECT_FIELD_GROUPS,
@@ -103,7 +104,7 @@ type ColKey =
   | 'aaAmount' | 'agreementAmount' | 'physicalProgress'
   | 'financialProgressCr' | 'financialProgressPct'
   | 'expectedCompletion' | 'status' | 'contractType' | 'outstandingGap' | 'priority'
-  | 'pbgAlert' | 'omStatus';
+  | 'pbgAlert' | 'omStatus' | 'remarks';
 
 interface ColDef { key: ColKey; label: string; defaultOn: boolean; locked?: boolean }
 
@@ -129,6 +130,7 @@ const COLUMN_DEFS: ColDef[] = [
   { key: 'priority',            label: 'Priority',              defaultOn: true  },
   { key: 'pbgAlert',            label: 'PBG Alert',             defaultOn: false },
   { key: 'omStatus',            label: 'O&M Status',            defaultOn: false },
+  { key: 'remarks',             label: 'Remarks',               defaultOn: false },
 ];
 
 const DEFAULT_COL_VIS = Object.fromEntries(
@@ -196,6 +198,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   const [showMdExportMenu, setShowMdExportMenu] = useState(false);
   const [mdExporting, setMdExporting]           = useState<'pdf' | 'pptx' | null>(null);
   const [mdExportError, setMdExportError]       = useState<string | null>(null);
+  const [remarksProject, setRemarksProject]     = useState<ProjectListItem | null>(null);
   const bodyRef  = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -873,6 +876,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                   columns={visibleCols}
                   activeProjectId={activeProjectId}
                   onSelect={setActiveProjectId}
+                  onOpenRemarks={setRemarksProject}
                   districtsById={districtsById}
                   divisionsById={divisionsById}
                   sectorsById={sectorsById}
@@ -883,6 +887,15 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
           </section>
         </div>
       </div>
+
+      {remarksProject ? (
+        <RemarksDialog
+          projectId={remarksProject.projectId}
+          projectName={remarksProject.projectName}
+          initialRemark={remarksProject.remark}
+          onClose={() => setRemarksProject(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1023,13 +1036,14 @@ function PortfolioKpiBody({
 
 // ── RIGHT panel: project table ───────────────────────────────────────────────
 function ProjectList({
-  projects, columns, activeProjectId, onSelect,
+  projects, columns, activeProjectId, onSelect, onOpenRemarks,
   districtsById, divisionsById, sectorsById, schemesById,
 }: {
   projects: ProjectListItem[];
   columns: ColDef[];
   activeProjectId: string | null;
   onSelect: (id: string) => void;
+  onOpenRemarks: (project: ProjectListItem) => void;
   districtsById: Map<number, string>;
   divisionsById: Map<number, { name: string; regionName: string }>;
   sectorsById: Map<number, string>;
@@ -1073,7 +1087,7 @@ function ProjectList({
               >
                 {columns.map((c) => (
                   <td key={c.key} className="px-3 py-2 align-middle">
-                    {renderCell(c.key, p, districtsById, divisionsById, sectorsById, schemesById)}
+                    {renderCell(c.key, p, districtsById, divisionsById, sectorsById, schemesById, onOpenRemarks)}
                   </td>
                 ))}
               </tr>
@@ -1299,6 +1313,7 @@ function renderCell(
   divisionsById: Map<number, { name: string; regionName: string }>,
   sectorsById: Map<number, string>,
   schemesById: Map<number, string>,
+  onOpenRemarks: (project: ProjectListItem) => void,
 ): React.ReactNode {
   switch (key) {
     case 'projectName':         return <span className="font-semibold text-[#1D4ED8]">{p.projectName}</span>;
@@ -1336,6 +1351,9 @@ function renderCell(
         omPeriodMonths={p.omPeriodMonths}
         omStatusOverride={p.omStatusOverride}
       />
+    );
+    case 'remarks': return (
+      <RemarksButton remark={p.remark} onClick={() => onOpenRemarks(p)} stopRowActivation />
     );
   }
 }

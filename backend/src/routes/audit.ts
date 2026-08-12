@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { requireAuth, requireMd } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import * as service from '../services/auditService.js';
 
-/** MD-only audit trail viewer. */
+/** Audit trail viewer — MD and Admin only. */
 export const auditRouter = Router();
 
-auditRouter.use(requireAuth, requireMd);
+auditRouter.use(requireAuth, requireRole('MD', 'Admin'));
 
 auditRouter.get('/', async (req, res, next) => {
   try {

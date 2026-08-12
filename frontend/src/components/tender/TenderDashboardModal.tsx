@@ -20,6 +20,7 @@ import type { Lookups, ProjectListItem, TenderSubStage } from '../../types/api';
 import { cn } from '../../lib/utils';
 import { formatDate } from '../../lib/formatters';
 import { Button } from '../ui/button';
+import { RemarksButton, RemarksDialog } from '../projects/RemarksDialog';
 import { Skeleton } from '../ui/skeleton';
 
 interface Props {
@@ -40,6 +41,7 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [stagesActive, setStagesActive] = useState<TenderSubStage>(FIRST_TENDER_SUB_STAGE);
   const [flash, setFlash] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const [remarksProject, setRemarksProject] = useState<ProjectListItem | null>(null);
 
   const lookupsQuery = useGetLookupsQuery(undefined, { skip: !open });
   // Backend listProjectsQuery caps `limit` at 100 (max page size). Anything
@@ -66,6 +68,7 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
       setStagesActive(FIRST_TENDER_SUB_STAGE);
       setTab('dashboard');
       setFlash(null);
+      setRemarksProject(null);
     }
   }, [open]);
 
@@ -264,6 +267,7 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
               onSelect={setSelectedStage}
               drillProjects={drillProjects}
               lookups={lookupsQuery.data}
+              onOpenRemarks={setRemarksProject}
             />
           ) : (
             <StagesTab
@@ -286,6 +290,15 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
           )}
         </div>
       </div>
+
+      {remarksProject ? (
+        <RemarksDialog
+          projectId={remarksProject.projectId}
+          projectName={remarksProject.projectName}
+          initialRemark={remarksProject.remark}
+          onClose={() => setRemarksProject(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -295,13 +308,14 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
  * ──────────────────────────────────────────────────────────────────────── */
 
 function DashboardTab({
-  byStage, selectedStage, onSelect, drillProjects, lookups,
+  byStage, selectedStage, onSelect, drillProjects, lookups, onOpenRemarks,
 }: {
   byStage: Map<TenderSubStage, ProjectListItem[]>;
   selectedStage: TenderSubStage | null;
   onSelect: (s: TenderSubStage | null) => void;
   drillProjects: ProjectListItem[];
   lookups: Lookups | undefined;
+  onOpenRemarks: (project: ProjectListItem) => void;
 }): JSX.Element {
   return (
     <div className="space-y-4">
@@ -376,6 +390,7 @@ function DashboardTab({
                     <th className="px-3 py-2 text-left">NIT Date</th>
                     <th className="px-3 py-2 text-left">Current Sub-Stage</th>
                     <th className="px-3 py-2 text-left">Last Updated</th>
+                    <th className="px-3 py-2 text-left">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -385,6 +400,7 @@ function DashboardTab({
                       project={p}
                       lookups={lookups}
                       subStage={selectedStage}
+                      onOpenRemarks={onOpenRemarks}
                     />
                   ))}
                 </tbody>
@@ -406,11 +422,12 @@ function DashboardTab({
  * endpoint) — pull them per row via cached RTK Query fetches.
  */
 function ProjectDrillRow({
-  project, lookups, subStage,
+  project, lookups, subStage, onOpenRemarks,
 }: {
   project: ProjectListItem;
   lookups: Lookups | undefined;
   subStage: TenderSubStage;
+  onOpenRemarks: (project: ProjectListItem) => void;
 }): JSX.Element {
   const detail = useGetProjectQuery(project.projectId);
   const division = project.divisionId
@@ -440,6 +457,9 @@ function ProjectDrillRow({
       </td>
       <td className="px-3 py-2 tabular-nums text-[#6B7280]">
         {project.lastUpdated ? formatDate(project.lastUpdated.slice(0, 10)) : '—'}
+      </td>
+      <td className="px-3 py-2">
+        <RemarksButton remark={project.remark} onClick={() => onOpenRemarks(project)} />
       </td>
     </tr>
   );

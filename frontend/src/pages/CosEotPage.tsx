@@ -22,13 +22,28 @@ const PAGE_SIZE = 25;
 
 export function CosEotPage(): JSX.Element {
   const [offset, setOffset] = useState(0);
-  const [category, setCategory] = useState<CosCategory | 'All'>('All');
   const [search, setSearch] = useState('');
   const { data, isLoading, isFetching } = useListCosEotRecordsQuery({
     limit: PAGE_SIZE,
     offset,
   });
   const lookups = useGetLookupsQuery();
+
+  // Task 6 — Filter panel (replaces the old always-visible category chips).
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [category, setCategory] = useState<CosCategory | 'All'>('All');
+  const [sectorId, setSectorId] = useState<number | null>(null);
+  const [districtId, setDistrictId] = useState<number | null>(null);
+  const [timeLinked, setTimeLinked] = useState<'Any' | 'Yes' | 'No'>('Any');
+  const activeFilterCount =
+    (category !== 'All' ? 1 : 0) + (sectorId !== null ? 1 : 0) +
+    (districtId !== null ? 1 : 0) + (timeLinked !== 'Any' ? 1 : 0);
+  const clearFilters = (): void => {
+    setCategory('All');
+    setSectorId(null);
+    setDistrictId(null);
+    setTimeLinked('Any');
+  };
 
   const districtsById = useMemo(() => {
     const map = new Map<number, string>();
@@ -46,6 +61,12 @@ export function CosEotPage(): JSX.Element {
     const term = search.trim().toLowerCase();
     let subset = raw;
     if (category !== 'All') subset = subset.filter((r) => r.category === category);
+    if (sectorId !== null) subset = subset.filter((r) => r.sectorId === sectorId);
+    if (districtId !== null) subset = subset.filter((r) => r.districtId === districtId);
+    if (timeLinked !== 'Any') {
+      const want = timeLinked === 'Yes';
+      subset = subset.filter((r) => Boolean(r.timeLinked) === want);
+    }
     if (term) {
       subset = subset.filter((r) => {
         const name = (r.projectName ?? '').toLowerCase();
@@ -55,7 +76,7 @@ export function CosEotPage(): JSX.Element {
       });
     }
     return subset;
-  }, [data, category, search]);
+  }, [data, category, sectorId, districtId, timeLinked, search]);
 
   const totals = useMemo(() => {
     const raw = data?.items ?? [];
@@ -83,21 +104,95 @@ export function CosEotPage(): JSX.Element {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {CATEGORIES.map((c) => (
+        <div className="relative">
           <button
-            key={c}
             type="button"
-            onClick={() => setCategory(c)}
+            onClick={() => setFilterOpen((v) => !v)}
+            aria-pressed={filterOpen}
+            aria-expanded={filterOpen}
             className={cn(
-              'rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors',
-              category === c
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors',
+              filterOpen || activeFilterCount > 0
                 ? 'border-[#7C3AED] bg-[#7C3AED] text-white'
                 : 'border-[#D1D5DB] bg-white text-[#6B7280] hover:text-[#374151]',
             )}
           >
-            {c}
+            ▾ Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </button>
-        ))}
+          {filterOpen ? (
+            <div className="absolute left-0 top-full z-20 mt-1.5 w-72 rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-lg">
+              <div className="space-y-2.5">
+                <label className="grid gap-1 text-[12px] text-[#374151]">
+                  Category
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as CosCategory | 'All')}
+                    className="h-8 w-full rounded border border-[#D1D5DB] bg-white px-2 text-[12.5px]"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-[12px] text-[#374151]">
+                  Sector
+                  <select
+                    value={sectorId === null ? '' : String(sectorId)}
+                    onChange={(e) => setSectorId(e.target.value ? Number(e.target.value) : null)}
+                    className="h-8 w-full rounded border border-[#D1D5DB] bg-white px-2 text-[12.5px]"
+                  >
+                    <option value="">All</option>
+                    {(lookups.data?.sectors ?? []).map((s) => (
+                      <option key={s.sectorId} value={s.sectorId}>{s.sectorName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-[12px] text-[#374151]">
+                  District
+                  <select
+                    value={districtId === null ? '' : String(districtId)}
+                    onChange={(e) => setDistrictId(e.target.value ? Number(e.target.value) : null)}
+                    className="h-8 w-full rounded border border-[#D1D5DB] bg-white px-2 text-[12.5px]"
+                  >
+                    <option value="">All</option>
+                    {(lookups.data?.districts ?? []).map((d) => (
+                      <option key={d.districtId} value={d.districtId}>{d.districtName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-[12px] text-[#374151]">
+                  Time linked
+                  <select
+                    value={timeLinked}
+                    onChange={(e) => setTimeLinked(e.target.value as 'Any' | 'Yes' | 'No')}
+                    className="h-8 w-full rounded border border-[#D1D5DB] bg-white px-2 text-[12.5px]"
+                  >
+                    <option value="Any">Any</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-[#F3F4F6] pt-2.5">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  disabled={activeFilterCount === 0}
+                  className="text-[11px] font-semibold text-[#B91C1C] hover:underline disabled:cursor-not-allowed disabled:text-[#D1D5DB]"
+                >
+                  Clear filters
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterOpen(false)}
+                  className="rounded bg-[#7C3AED] px-3 py-1 text-[11px] font-semibold text-white hover:bg-[#6D28D9]"
+                >
+                  Done ✓
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}

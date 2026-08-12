@@ -12,7 +12,6 @@ import {
   Gavel,
   LayoutDashboard,
   Map,
-  MapPin,
   Tag,
   X,
 } from 'lucide-react';
@@ -48,7 +47,6 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/sectors',             label: 'Sectors',            Icon: Tag },
   { to: '/schemes',             label: 'Schemes',            Icon: FolderTree },
   { to: '/projects',            label: 'Projects',           Icon: ClipboardList },
-  { to: '/districts',           label: 'Districts',          Icon: MapPin, hideFor: ['PD'] },
   { to: '/divisions',           label: 'Divisions',          Icon: Map,    hideFor: ['PD'] },
   { to: '/cos-eot',             label: 'CoS / EoT',          Icon: FileEdit },
   { to: '/management-actions',  label: 'Management Action',  Icon: CheckSquare },

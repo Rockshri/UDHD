@@ -8,10 +8,14 @@ import { Skeleton } from '../ui/skeleton';
 import { cn } from '../../lib/utils';
 
 interface Props {
-  /** Only one of these should be set at a time. */
+  /** Scoping filters — any combination may be set; all combine with AND. */
   schemeId?: number;
   sectorId?: number;
   districtId?: number;
+  divisionId?: number;
+  /** Execution status (e.g. 'Completed', 'Delayed') — used by the
+   *  clickable portfolio-metric blocks on Divisions/Schemes/etc. */
+  status?: string;
   labelOfContext: string;
   onClose: () => void;
 }
@@ -20,6 +24,8 @@ export function DrillTable({
   schemeId,
   sectorId,
   districtId,
+  divisionId,
+  status,
   labelOfContext,
   onClose,
 }: Props): JSX.Element {
@@ -28,6 +34,8 @@ export function DrillTable({
     ...(schemeId ? { schemeId } : {}),
     ...(sectorId ? { sectorId } : {}),
     ...(districtId ? { districtId } : {}),
+    ...(divisionId ? { divisionId } : {}),
+    ...(status ? { status } : {}),
   };
   const { data, isLoading } = useListProjectsQuery(args);
   const items = data?.items ?? [];
