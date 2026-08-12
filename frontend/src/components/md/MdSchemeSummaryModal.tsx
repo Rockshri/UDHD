@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
 import { useGetDelayStatusQuery } from '../../app/api/kpisApi';
+import {
+  downloadMdBriefing,
+  type MdBriefingFormat,
+} from '../../app/api/mdBriefingExportApi';
 import { useGetProjectQuery, useListProjectsQuery } from '../../app/api/projectsApi';
+import { useAppSelector } from '../../app/hooks';
+import { selectAccessToken } from '../../features/auth/authSlice';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { OmAlertCell } from '../projects/OmAlertCell';
@@ -288,6 +294,37 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   const [filterDivisionId, setFilterDivisionId] = useState<number | null>(null);
   const [filterStatus,     setFilterStatus]     = useState<string | null>(null);
 
+  // Export state — dropdown open/closed + in-flight/error surfaced in the
+  // header. Filters above define the "currently-viewed slice" that gets
+  // packaged into the exported briefing document.
+  const accessToken = useAppSelector(selectAccessToken);
+  const [exportOpen,  setExportOpen]  = useState(false);
+  const [exportBusy,  setExportBusy]  = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  const runExport = async (format: MdBriefingFormat): Promise<void> => {
+    setExportOpen(false);
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      await downloadMdBriefing({
+        format,
+        accessToken,
+        filters: {
+          schemeId:   filterSchemeId,
+          sectorId:   filterSectorId,
+          divisionId: filterDivisionId,
+          status:     filterStatus,
+        },
+      });
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Export failed.');
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [openPicker, setOpenPicker]           = useState<null | 'kpi' | 'cols' | 'proj'>(null);
   const [colSearch, setColSearch]             = useState('');
@@ -340,13 +377,26 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     if (!open) return;
     const handler = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return;
+      if (exportOpen)      { setExportOpen(false);   return; }
       if (openPicker)      { setOpenPicker(null);     return; }
       if (activeProjectId) { setActiveProjectId(null); return; }
       onClose();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open, openPicker, activeProjectId, onClose]);
+  }, [open, exportOpen, openPicker, activeProjectId, onClose]);
+
+  // ── Outside-click closes the export dropdown ──
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent): void => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
 
   // Any filter change clears the drilled-in project (it may have just been
   // filtered out of view).
@@ -619,6 +669,48 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
             <h2 className="mt-0.5 text-[15px] font-bold text-white">Scheme Summary</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {/* Export dropdown — exports the currently-viewed slice
+                (whatever filters are active on the row below). */}
+            <div ref={exportMenuRef} className="relative">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setExportOpen((v) => !v)}
+                disabled={exportBusy}
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+                title="Export the current view (Excel / PDF / PowerPoint)"
+                className="border-white/40 bg-white/15 text-white hover:bg-white/25"
+              >
+                {exportBusy ? 'Exporting…' : '📤 Export ▾'}
+              </Button>
+              {exportOpen ? (
+                <div
+                  role="menu"
+                  aria-label="Export format"
+                  className="absolute right-0 top-full z-50 mt-1.5 w-[210px] overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-xl"
+                >
+                  <ExportMenuItem
+                    icon="📊"
+                    label="Excel (.xlsx)"
+                    hint="Summary + full project list"
+                    onClick={() => void runExport('xlsx')}
+                  />
+                  <ExportMenuItem
+                    icon="📄"
+                    label="PDF (.pdf)"
+                    hint="Landscape summary + table"
+                    onClick={() => void runExport('pdf')}
+                  />
+                  <ExportMenuItem
+                    icon="📽"
+                    label="PowerPoint (.pptx)"
+                    hint="Cover · KPIs · Breakdown · Projects"
+                    onClick={() => void runExport('pptx')}
+                  />
+                </div>
+              ) : null}
+            </div>
             <Button
               size="sm"
               variant="outline"
@@ -630,6 +722,21 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
             </Button>
           </div>
         </header>
+        {exportError ? (
+          <div
+            role="alert"
+            className="shrink-0 border-b border-[#FCA5A5] bg-[#FEF2F2] px-3 py-1.5 text-[11.5px] font-medium text-[#B91C1C]"
+          >
+            {exportError}
+            <button
+              type="button"
+              onClick={() => setExportError(null)}
+              className="ml-2 text-[10px] font-bold uppercase tracking-wider text-[#7F1D1D] hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
 
         {/* ── Body: two panels — resizable via draggable divider on lg+ ─── */}
         <div
@@ -1626,5 +1733,33 @@ function FieldPickerPanel({
         {renderBody()}
       </div>
     </div>
+  );
+}
+
+/**
+ * Single row inside the header's Export dropdown. Kept as a small local
+ * component so the dropdown JSX in the header stays legible.
+ */
+function ExportMenuItem({
+  icon, label, hint, onClick,
+}: {
+  icon: string;
+  label: string;
+  hint: string;
+  onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="flex w-full items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-[#F3F4F6]"
+    >
+      <span aria-hidden className="mt-0.5 text-[14px]">{icon}</span>
+      <span className="flex flex-col">
+        <span className="text-[12.5px] font-semibold text-[#111827]">{label}</span>
+        <span className="text-[10.5px] text-[#6B7280]">{hint}</span>
+      </span>
+    </button>
   );
 }

@@ -9,6 +9,7 @@ import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import { kpisRouter } from './routes/kpis.js';
 import { lookupsRouter } from './routes/lookups.js';
+import { mdBriefingExportRouter } from './routes/mdBriefingExport.js';
 import { momRouter } from './routes/mom.js';
 import { preMonsoonRouter } from './routes/preMonsoon.js';
 import { projectsRouter } from './routes/projects.js';
@@ -39,6 +40,7 @@ export function createApp(): Express {
   app.use('/api/users', usersRouter);
   app.use('/api/audit', auditRouter);
   app.use('/api/uploads', uploadsRouter);
+  app.use('/api/md-briefing', mdBriefingExportRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

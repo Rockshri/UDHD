@@ -113,10 +113,19 @@ export function StageBucketsCard(): JSX.Element {
                 const pct = totalActive > 0 ? (count / totalActive) * 100 : 0;
                 const styles = TONE_STYLES[stage.tone];
                 const isEmpty = count === 0;
+                // Card.md §3 fix — ProjectsPage filters by `projectStageV2`
+                // whose enum uses the British spelling `Conceptualisation`,
+                // but v_stage_buckets keys the tile by the legacy US spelling
+                // `Conceptualization`. Map only the Concept tile so its click
+                // actually filters. All other stage keys already match the
+                // v2 enum verbatim.
+                const urlStageValue = stage.key === 'Conceptualization'
+                  ? 'Conceptualisation'
+                  : stage.key;
                 return (
                   <li key={stage.key} className="relative">
                     <NavLink
-                      to={`/projects?projectStage=${encodeURIComponent(stage.key)}`}
+                      to={`/projects?projectStage=${encodeURIComponent(urlStageValue)}`}
                       aria-disabled={isEmpty}
                       className={cn(
                         'group flex h-full flex-col justify-between rounded-lg border p-3 transition-all',

@@ -11,7 +11,6 @@ import { PbgExpiryBanner } from '../components/overview/PbgExpiryBanner';
 import { ScheduleVsActualCard } from '../components/overview/ScheduleVsActualCard';
 import { SectorSummaryCard } from '../components/overview/SectorSummaryCard';
 import { StageBucketsCard } from '../components/overview/StageBucketsCard';
-import { WorkTypeCountsCard } from '../components/overview/WorkTypeCountsCard';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
@@ -66,9 +65,11 @@ export function OverviewPage(): JSX.Element {
 
       <StageBucketsCard />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Work Type Mix section removed per user request. Row collapses from
+          3 cols to 2 so ScheduleVsActual + FinancialSecurities each take
+          half-width on lg+. On mobile they stack (default single column). */}
+      <div className="grid gap-4 lg:grid-cols-2">
         <ScheduleVsActualCard />
-        <WorkTypeCountsCard />
         <FinancialSecuritiesCard />
       </div>
 

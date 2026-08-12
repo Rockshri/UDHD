@@ -20,6 +20,9 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed-admin": "tsx src/db/seedAdmin.ts",
     "db:seed-projects": "tsx src/db/seedProjects.ts",
+    "db:seed-premonsoon": "tsx src/db/seedPreMonsoon.ts",
+    "db:seed-fake": "tsx src/db/seedFakeProjects.ts",
+    "db:backfill-dashboard": "tsx src/db/backfillDashboardFields.ts",
     "db:studio": "drizzle-kit studio",
     "db:backfill-divisions": "tsx src/scripts/backfillDivisions.ts",
     "gen:input-template": "tsx src/scripts/generateInputSheetTemplate.ts"

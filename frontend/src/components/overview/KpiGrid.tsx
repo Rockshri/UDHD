@@ -1,5 +1,5 @@
 import type { OverviewKpis } from '../../types/api';
-import { formatCurrencyCr, formatInteger, formatPercent } from '../../lib/formatters';
+import { formatCurrencyCr, formatInteger } from '../../lib/formatters';
 import { StatCard } from './StatCard';
 
 interface KpiGridProps {
@@ -62,51 +62,58 @@ export function KpiGrid({ data }: KpiGridProps): JSX.Element {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/*
+        Card.md rework — replaced the old money+% rows (Total AA/Total
+        Agreement/Total Financial + Avg Physical/Avg Financial/Financial
+        Utilisation) with 4 focused cards: two money totals + two
+        contract-type drill-throughs. Backend still exposes the removed
+        fields (used elsewhere), so no API deprecation.
+      */}
+      {/*
+        5-card money+contract+prep row. Responsive layout:
+          - <sm  (mobile):        1 col
+          - sm ..< lg (tablet):   2 cols  (3 rows of 2+2+1)
+          - lg+ (desktop):        5 cols in one row
+        Preserves the mobile-first pattern used elsewhere in the dashboard.
+      */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
-          label="Total AA"
+          label="Total Sanctioned"
           value={formatCurrencyCr(data?.totalAaCr)}
-          hint="Administrative approval"
+          hint="Administrative approval — portfolio total"
           tone="brand"
           icon="₹"
         />
         <StatCard
-          label="Total Agreement"
-          value={formatCurrencyCr(data?.totalAgreementCr)}
-          hint="Contract value across portfolio"
-          tone="info"
-          icon="✍️"
-        />
-        <StatCard
-          label="Total Financial"
+          label="Total Expenditure"
           value={formatCurrencyCr(data?.totalFinancialCr)}
           hint="Utilised to date"
           tone="success"
           icon="💰"
         />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
-          label="Avg Physical Progress"
-          value={formatPercent(data?.avgPhysicalPct)}
-          hint="Milestone-weighted where available"
+          label="Work Contract"
+          value={formatInteger(data?.workContractCount)}
+          hint={pctOfTotal(data?.workContractCount, total)}
           tone="info"
-          icon="🏗️"
+          icon="🛠️"
+          to="/projects?contractType=Work+Contract"
         />
         <StatCard
-          label="Avg Financial Progress"
-          value={formatPercent(data?.avgFinancialPct)}
-          hint="Average across all projects"
-          tone="success"
-          icon="📈"
+          label="Service Contract"
+          value={formatInteger(data?.serviceContractCount)}
+          hint={pctOfTotal(data?.serviceContractCount, total)}
+          tone="warning"
+          icon="🧾"
+          to="/projects?contractType=Service+Contract"
         />
         <StatCard
-          label="Financial Utilisation"
-          value={formatPercent(data?.financialUtilisationPct)}
-          hint="Utilised ÷ Sanctioned"
-          tone="brand"
-          icon="📊"
+          label="Pre-Monsoon Prep"
+          value={formatInteger(data?.preMonsoonPrepCount)}
+          hint="Preparation topics tracked"
+          tone="danger"
+          icon="🌧️"
+          to="/pre-monsoon"
         />
       </div>
     </section>

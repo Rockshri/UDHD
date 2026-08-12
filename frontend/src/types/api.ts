@@ -155,6 +155,11 @@ export interface OverviewKpis {
   avgPhysicalPct: number | null;
   avgFinancialPct: number | null;
   financialUtilisationPct: number | null;
+  /** Card.md §2.3/§2.4 — counts drive drill-through cards on the Overview page. */
+  workContractCount: number;
+  serviceContractCount: number;
+  /** Card.md follow-up — count of pre_monsoon_item rows (drills into /pre-monsoon). */
+  preMonsoonPrepCount: number;
 }
 
 export interface ScheduleVsActual {

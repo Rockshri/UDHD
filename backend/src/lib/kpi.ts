@@ -69,11 +69,23 @@ export interface OverviewKpis {
   avgPhysicalPct: number | null;
   avgFinancialPct: number | null;
   financialUtilisationPct: number | null;
+  /** Added for Card.md §2.3/§2.4 — Overview cards drill into Projects Register
+   *  via /projects?contractType=Work+Contract etc. */
+  workContractCount: number;
+  serviceContractCount: number;
+  /** Card.md follow-up — count of rows in pre_monsoon_item (global table,
+   *  independent of division). Drills into the /pre-monsoon page. */
+  preMonsoonPrepCount: number;
 }
 
 export async function getOverviewKpis(divisionId: number | null = null): Promise<OverviewKpis> {
   if (divisionId === null) {
+    // Portfolio-wide (MD/Admin/Viewer). The view v_overview_kpis doesn't
+    // expose contract-type counts — fetch them in a small side-query
+    // instead of adding columns to the view (avoids a migration).
     const [row] = await db.select().from(vOverviewKpis);
+    const counts = await getContractTypeCounts(null);
+    const preMonsoonPrepCount = await getPreMonsoonPrepCount();
     return {
       total: row?.total ?? 0,
       completed: row?.completed ?? 0,
@@ -87,6 +99,9 @@ export async function getOverviewKpis(divisionId: number | null = null): Promise
       avgPhysicalPct: toNumberOrNull(row?.avgPhysicalPct),
       avgFinancialPct: toNumberOrNull(row?.avgFinancialPct),
       financialUtilisationPct: toNumberOrNull(row?.financialUtilisationPct),
+      workContractCount: counts.workContractCount,
+      serviceContractCount: counts.serviceContractCount,
+      preMonsoonPrepCount,
     };
   }
   const result = await db.execute<{
@@ -94,6 +109,7 @@ export async function getOverviewKpis(divisionId: number | null = null): Promise
     on_hold: number; not_started: number;
     total_aa_cr: string | null; total_agreement_cr: string | null; total_financial_cr: string | null;
     avg_physical_pct: string | null; avg_financial_pct: string | null; financial_utilisation_pct: string | null;
+    work_contract_count: number; service_contract_count: number;
   }>(sql`
     SELECT
       COUNT(*)                                                                  AS total,
@@ -109,7 +125,9 @@ export async function getOverviewKpis(divisionId: number | null = null): Promise
       ROUND(SUM(COALESCE(p.financial_progress_pct,0)) / NULLIF(COUNT(*),0), 1)  AS avg_financial_pct,
       ROUND(
         SUM(COALESCE(p.financial_progress_cr,0)) / NULLIF(SUM(COALESCE(p.aa_amount_cr,0)),0) * 100
-      , 1)                                                                       AS financial_utilisation_pct
+      , 1)                                                                       AS financial_utilisation_pct,
+      COUNT(*) FILTER (WHERE p.contract_type = 'Work Contract')                 AS work_contract_count,
+      COUNT(*) FILTER (WHERE p.contract_type = 'Service Contract')              AS service_contract_count
     FROM project p
     JOIN v_project_effective_physical ep ON ep.project_id = p.project_id
     WHERE p.division_id = ${divisionId}
@@ -118,8 +136,12 @@ export async function getOverviewKpis(divisionId: number | null = null): Promise
     on_hold: number; not_started: number;
     total_aa_cr: string | null; total_agreement_cr: string | null; total_financial_cr: string | null;
     avg_physical_pct: string | null; avg_financial_pct: string | null; financial_utilisation_pct: string | null;
+    work_contract_count: number; service_contract_count: number;
   }>;
   const r = result.rows[0];
+  // pre_monsoon_item is a global table (no division_id) — the count is
+  // the same regardless of the PD's scope, so reuse the null-path helper.
+  const preMonsoonPrepCount = await getPreMonsoonPrepCount();
   return {
     total: Number(r?.total ?? 0),
     completed: Number(r?.completed ?? 0),
@@ -133,6 +155,53 @@ export async function getOverviewKpis(divisionId: number | null = null): Promise
     avgPhysicalPct: toNumberOrNull(r?.avg_physical_pct ?? null),
     avgFinancialPct: toNumberOrNull(r?.avg_financial_pct ?? null),
     financialUtilisationPct: toNumberOrNull(r?.financial_utilisation_pct ?? null),
+    workContractCount: Number(r?.work_contract_count ?? 0),
+    serviceContractCount: Number(r?.service_contract_count ?? 0),
+    preMonsoonPrepCount,
+  };
+}
+
+/**
+ * Small side-query for the count of Pre-Monsoon preparation topics.
+ * `pre_monsoon_item` is a global list (no division scope), so the same
+ * count serves both portfolio-wide and PD-scoped Overview responses.
+ */
+async function getPreMonsoonPrepCount(): Promise<number> {
+  const result = await db.execute(
+    sql`SELECT COUNT(*)::int AS n FROM pre_monsoon_item`,
+  ) as unknown as Rows<{ n: number }>;
+  return Number(result.rows[0]?.n ?? 0);
+}
+
+/**
+ * Small side-query for the two contract-type counts. Portfolio-wide when
+ * divisionId is null; scoped to a division otherwise. Extracted to keep
+ * `getOverviewKpis` readable and to avoid touching the v_overview_kpis
+ * view definition (which would need a migration).
+ */
+async function getContractTypeCounts(
+  divisionId: number | null,
+): Promise<{ workContractCount: number; serviceContractCount: number }> {
+  const result = await db.execute(
+    divisionId === null
+      ? sql`
+          SELECT
+            COUNT(*) FILTER (WHERE contract_type = 'Work Contract')    AS work,
+            COUNT(*) FILTER (WHERE contract_type = 'Service Contract') AS service
+          FROM project
+        `
+      : sql`
+          SELECT
+            COUNT(*) FILTER (WHERE contract_type = 'Work Contract')    AS work,
+            COUNT(*) FILTER (WHERE contract_type = 'Service Contract') AS service
+          FROM project
+          WHERE division_id = ${divisionId}
+        `,
+  ) as unknown as Rows<{ work: number; service: number }>;
+  const r = result.rows[0];
+  return {
+    workContractCount: Number(r?.work ?? 0),
+    serviceContractCount: Number(r?.service ?? 0),
   };
 }
 
