@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
-import { useGetProjectQuery } from '../../app/api/projectsApi';
+import { useDeleteProjectMutation, useGetProjectQuery } from '../../app/api/projectsApi';
 import { useListCosEotForProjectQuery } from '../../app/api/cosEotApi';
 import { useListMgmtActionsForProjectQuery } from '../../app/api/mgmtActionsApi';
 import { useListMilestonesQuery } from '../../app/api/milestonesApi';
+import { useAppSelector } from '../../app/hooks';
+import { selectCurrentUser } from '../../features/auth/authSlice';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { OmAlertCell } from './OmAlertCell';
@@ -221,6 +223,30 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
   const [fieldSearch, setFieldSearch]   = useState('');
   const [visibility, setVisibility]     = useState<Record<FieldKey, boolean>>(loadVisibility);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Delete flow — MD bypasses always; Admin needs canDeleteProjects=true
+  // (matches backend requireProjectDelete gate).
+  const currentUser = useAppSelector(selectCurrentUser);
+  const canDelete = currentUser?.role === 'MD'
+    || (currentUser?.role === 'Admin' && Boolean(currentUser.canDeleteProjects));
+  const [deleteProject, deleteState] = useDeleteProjectMutation();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+
+  const runDelete = async (): Promise<void> => {
+    if (!projectId) return;
+    setDeleteError(null);
+    try {
+      await deleteProject(projectId).unwrap();
+      setShowDeleteConfirm(false);
+      setConfirmText('');
+      onClose();
+    } catch (e) {
+      const err = e as { data?: { error?: { message?: string } }; status?: number };
+      setDeleteError(err.data?.error?.message ?? `Delete failed (HTTP ${err.status ?? '?'})`);
+    }
+  };
 
   const isVisible = (key: FieldKey): boolean => visibility[key] ?? true;
 
@@ -492,6 +518,16 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
               >
                 📋 Other Details
               </NavLink>
+            ) : null}
+            {canDelete && project ? (
+              <button
+                type="button"
+                onClick={() => { setDeleteError(null); setConfirmText(''); setShowDeleteConfirm(true); }}
+                title="Permanently delete this project"
+                className="rounded-md border border-[#FCA5A5] bg-[#B91C1C]/90 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-[#B91C1C]"
+              >
+                🗑 Delete
+              </button>
             ) : null}
             <Button
               size="sm"
@@ -921,6 +957,80 @@ export function ProjectProfileModal({ projectId, onClose }: Props): JSX.Element 
           #project-profile-print-area { position: absolute; top: 0; left: 0; width: 100%; }
         }
       `}</style>
+
+      {/* Delete-project confirmation. Sits ABOVE the profile modal so the
+          gradient header stays visible behind the dimming backdrop. */}
+      {showDeleteConfirm && project ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-project-title"
+          className="fixed inset-0 z-[60] flex items-center justify-center px-3"
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={deleteState.isLoading ? undefined : () => setShowDeleteConfirm(false)}
+          />
+          <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-2xl">
+            <header className="rounded-t-xl border-b border-[#F3F4F6] bg-[#FEF2F2] px-5 py-4">
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#B91C1C]">
+                ⚠ Destructive action
+              </p>
+              <h3 id="delete-project-title" className="mt-0.5 text-[16px] font-bold text-[#111827]">
+                Delete project <span className="text-[#B91C1C]">{project.projectName}</span>?
+              </h3>
+            </header>
+            <div className="space-y-3 px-5 py-4 text-[13px] text-[#374151]">
+              <p>
+                This will permanently remove the project along with its
+                CoS/EoT entries, management actions, geo-photos, and
+                milestone data. This action cannot be undone.
+              </p>
+              <p className="text-[12px] text-[#6B7280]">
+                Audit-trail records are retained.
+              </p>
+              <label className="mt-2 grid gap-1 text-[12px] font-semibold text-[#374151]">
+                Type <span className="rounded bg-[#F3F4F6] px-1 py-0.5 font-mono text-[11px] text-[#B91C1C]">{project.projectName}</span> to confirm:
+                <input
+                  type="text"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  disabled={deleteState.isLoading}
+                  autoFocus
+                  autoComplete="off"
+                  className="h-9 w-full rounded border border-[#D1D5DB] bg-white px-3 text-sm text-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B91C1C] focus-visible:ring-offset-1"
+                />
+              </label>
+              {deleteError ? (
+                <p role="alert" className="rounded border border-[#FCA5A5] bg-[#FEF2F2] px-3 py-2 text-[12px] font-medium text-[#B91C1C]">
+                  {deleteError}
+                </p>
+              ) : null}
+            </div>
+            <footer className="flex items-center justify-end gap-2 rounded-b-xl border-t border-[#F3F4F6] bg-[#F9FAFB] px-5 py-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteState.isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => void runDelete()}
+                disabled={deleteState.isLoading || confirmText !== project.projectName}
+                title={confirmText !== project.projectName ? `Type "${project.projectName}" to enable` : undefined}
+              >
+                {deleteState.isLoading ? 'Deleting…' : 'Delete project'}
+              </Button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

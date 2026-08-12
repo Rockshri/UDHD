@@ -11,10 +11,11 @@
 
 export type MdBriefingFormat = 'xlsx' | 'pdf' | 'pptx';
 
-/** Same 4 filters the MdSchemeSummaryModal exposes. */
+/** Same 5 filters the MdSchemeSummaryModal exposes. */
 export interface MdBriefingFilters {
   schemeId?: number | null;
   sectorId?: number | null;
+  regionId?: number | null;
   divisionId?: number | null;
   status?: string | null;
 }
@@ -34,6 +35,7 @@ export async function downloadMdBriefing({ format, filters, accessToken }: Downl
   const params = new URLSearchParams({ format });
   if (filters.schemeId   != null) params.set('schemeId',   String(filters.schemeId));
   if (filters.sectorId   != null) params.set('sectorId',   String(filters.sectorId));
+  if (filters.regionId   != null) params.set('regionId',   String(filters.regionId));
   if (filters.divisionId != null) params.set('divisionId', String(filters.divisionId));
   if (filters.status)             params.set('status',     filters.status);
 
@@ -61,6 +63,36 @@ export async function downloadMdBriefing({ format, filters, accessToken }: Downl
   const suggested = extractFilenameFromDisposition(res.headers.get('Content-Disposition'))
     ?? `md-briefing.${format}`;
   triggerBlobDownload(blob, suggested);
+}
+
+// ─── Project snapshot (single project, drilled-in view) ──────────────────
+
+export type ProjectSnapshotFormat = 'xlsx' | 'pdf';
+
+interface SnapshotOpts {
+  projectId: string;
+  format: ProjectSnapshotFormat;
+  accessToken: string | null;
+}
+
+/**
+ * Download a single-project snapshot (PDF one-pager or XLSX single-row
+ * import-template). Backend route is MD-only.
+ */
+export async function downloadProjectSnapshot({ projectId, format, accessToken }: SnapshotOpts): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+  const url = `/api/projects/${encodeURIComponent(projectId)}/snapshot?format=${format}`;
+  const res = await fetch(url, { method: 'GET', headers, credentials: 'include' });
+  if (!res.ok) {
+    let msg = `Snapshot export failed (HTTP ${res.status})`;
+    try { const body = await res.json(); msg = body?.error?.message ?? msg; } catch { /* body not JSON */ }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const filename = extractFilenameFromDisposition(res.headers.get('Content-Disposition'))
+    ?? `project-snapshot.${format}`;
+  triggerBlobDownload(blob, filename);
 }
 
 /** Parse the filename off `Content-Disposition: attachment; filename="..."`. */

@@ -30,10 +30,11 @@ import { getLookups, type LookupsResponse } from './lookupsService.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const PptxGenJS = PptxGenJSDefault as unknown as new () => any;
 
-/** The 4 filters the modal exposes — mirror of MdSchemeSummaryModal state. */
+/** The 5 filters the modal exposes — mirror of MdSchemeSummaryModal state. */
 export interface MdBriefingFilters {
   schemeId?: number;
   sectorId?: number;
+  regionId?: number;
   divisionId?: number;
   status?: string;
 }
@@ -56,6 +57,7 @@ interface Summary {
 interface Context {
   schemeName: string | null;
   sectorName: string | null;
+  regionName: string | null;
   divisionName: string | null;
   status: string | null;
   generatedAt: Date;
@@ -71,6 +73,7 @@ async function loadSlice(
   const q: ListProjectsQuery = { limit: 100 };
   if (filters.schemeId !== undefined) q.schemeId = filters.schemeId;
   if (filters.sectorId !== undefined) q.sectorId = filters.sectorId;
+  if (filters.regionId !== undefined) q.regionId = filters.regionId;
   if (filters.divisionId !== undefined) q.divisionId = filters.divisionId;
   if (filters.status !== undefined) q.status = filters.status;
 
@@ -87,6 +90,9 @@ async function loadSlice(
       : null,
     sectorName: filters.sectorId !== undefined
       ? lookups.sectors.find((s) => s.sectorId === filters.sectorId)?.sectorName ?? `#${filters.sectorId}`
+      : null,
+    regionName: filters.regionId !== undefined
+      ? lookups.regions.find((r) => r.regionId === filters.regionId)?.regionName ?? `#${filters.regionId}`
       : null,
     divisionName: filters.divisionId !== undefined
       ? lookups.divisions.find((d) => d.divisionId === filters.divisionId)?.divisionName ?? `#${filters.divisionId}`
@@ -150,6 +156,7 @@ function contextLine(ctx: Context): string {
   const parts: string[] = [];
   if (ctx.schemeName)   parts.push(`Scheme: ${ctx.schemeName}`);
   if (ctx.sectorName)   parts.push(`Sector: ${ctx.sectorName}`);
+  if (ctx.regionName)   parts.push(`Region: ${ctx.regionName}`);
   if (ctx.divisionName) parts.push(`Division: ${ctx.divisionName}`);
   if (ctx.status)       parts.push(`Status: ${ctx.status}`);
   return parts.length > 0 ? parts.join(' · ') : 'Full portfolio (no filters)';
@@ -162,6 +169,7 @@ export function briefingFilenameStem(ctx: Context): string {
   const parts: string[] = ['md-briefing'];
   if (ctx.schemeName)   parts.push(slug(ctx.schemeName));
   if (ctx.sectorName)   parts.push(slug(ctx.sectorName));
+  if (ctx.regionName)   parts.push(slug(ctx.regionName));
   if (ctx.divisionName) parts.push(slug(ctx.divisionName));
   const ymd = ctx.generatedAt.toISOString().slice(0, 10);
   return [...parts, ymd].filter(Boolean).join('_');

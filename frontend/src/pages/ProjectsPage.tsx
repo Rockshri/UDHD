@@ -132,10 +132,11 @@ export function ProjectsPage(): JSX.Element {
     {
       type: 'submenu' as const,
       label: '📤  Export current view',
+      // PPT dropped from this menu — project lists don't slide well.
+      // Multi-select "Export selected" still offers all 3 formats.
       items: [
-        { type: 'action', label: 'Excel (.xlsx)',     onClick: () => void runExport('xlsx') },
-        { type: 'action', label: 'PDF (.pdf)',         onClick: () => void runExport('pdf') },
-        { type: 'action', label: 'PowerPoint (.pptx)', onClick: () => void runExport('pptx') },
+        { type: 'action', label: 'Excel (.xlsx)', onClick: () => void runExport('xlsx') },
+        { type: 'action', label: 'PDF (.pdf)',     onClick: () => void runExport('pdf') },
       ],
     },
   ];

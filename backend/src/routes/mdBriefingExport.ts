@@ -32,6 +32,7 @@ const filtersSchema = z.object({
   format: z.enum(['xlsx', 'pdf', 'pptx']),
   schemeId:   z.coerce.number().int().positive().optional(),
   sectorId:   z.coerce.number().int().positive().optional(),
+  regionId:   z.coerce.number().int().positive().optional(),
   divisionId: z.coerce.number().int().positive().optional(),
   status:     z.string().min(1).max(60).optional(),
 });
@@ -42,6 +43,7 @@ mdBriefingExportRouter.get('/export', async (req, res, next) => {
     const filters: MdBriefingFilters = {};
     if (q.schemeId   !== undefined) filters.schemeId   = q.schemeId;
     if (q.sectorId   !== undefined) filters.sectorId   = q.sectorId;
+    if (q.regionId   !== undefined) filters.regionId   = q.regionId;
     if (q.divisionId !== undefined) filters.divisionId = q.divisionId;
     if (q.status     !== undefined) filters.status     = q.status;
 

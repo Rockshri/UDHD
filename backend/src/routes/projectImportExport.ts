@@ -11,6 +11,10 @@ import {
   generateBlankTemplateXlsx, type ExportFilters,
 } from '../services/projectExportService.js';
 import { importProjects, type ImportMode } from '../services/projectImportService.js';
+import {
+  exportProjectSnapshotToPdf, exportProjectSnapshotToXlsx,
+  snapshotFilenameStem,
+} from '../services/projectSnapshotService.js';
 
 /**
  * Project import + export routes.
@@ -144,6 +148,49 @@ projectImportExportRouter.get('/export', async (req, res, next) => {
     next(err);
   }
 });
+
+// ─── GET /projects/:projectId/snapshot?format=xlsx|pdf — MD-only single-project ──
+const snapshotQuerySchema = z.object({
+  format: z.enum(['xlsx', 'pdf']),
+});
+const snapshotParamSchema = z.object({
+  projectId: z.string().min(1).max(60),
+});
+
+// MD-only — matches the MD Portfolio Briefing surface where this action
+// lives. Admin/PD/Viewer can use the general /export flow instead.
+projectImportExportRouter.get(
+  '/:projectId/snapshot',
+  requireRole('MD'),
+  async (req, res, next) => {
+    try {
+      const { projectId } = snapshotParamSchema.parse(req.params);
+      const { format } = snapshotQuerySchema.parse(req.query);
+      const actor = actorFromReq(req);
+      const pdDivisionId = sessionDivisionId(req);
+
+      let out: Awaited<ReturnType<typeof exportProjectSnapshotToPdf>>;
+      let mime: string;
+      let ext: string;
+      if (format === 'xlsx') {
+        out = await exportProjectSnapshotToXlsx(projectId, actor, pdDivisionId);
+        mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        ext = 'xlsx';
+      } else {
+        out = await exportProjectSnapshotToPdf(projectId, actor, pdDivisionId);
+        mime = 'application/pdf';
+        ext = 'pdf';
+      }
+      const filename = `${snapshotFilenameStem(out.ctx)}.${ext}`;
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', String(out.buffer.length));
+      res.status(200).end(out.buffer);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // Silence unused-import warnings for requireWriter (route is auth-only, not
 // writer-scoped — export is available to Viewers too).

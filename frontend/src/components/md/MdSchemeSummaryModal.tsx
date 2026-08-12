@@ -3,7 +3,9 @@ import { useGetLookupsQuery } from '../../app/api/lookupsApi';
 import { useGetDelayStatusQuery } from '../../app/api/kpisApi';
 import {
   downloadMdBriefing,
+  downloadProjectSnapshot,
   type MdBriefingFormat,
+  type ProjectSnapshotFormat,
 } from '../../app/api/mdBriefingExportApi';
 import { useGetProjectQuery, useListProjectsQuery } from '../../app/api/projectsApi';
 import { useAppSelector } from '../../app/hooks';
@@ -291,6 +293,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   // answer to Q1 during spec review).
   const [filterSchemeId,   setFilterSchemeId]   = useState<number | null>(null);
   const [filterSectorId,   setFilterSectorId]   = useState<number | null>(null);
+  const [filterRegionId,   setFilterRegionId]   = useState<number | null>(null);
   const [filterDivisionId, setFilterDivisionId] = useState<number | null>(null);
   const [filterStatus,     setFilterStatus]     = useState<string | null>(null);
 
@@ -314,6 +317,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
         filters: {
           schemeId:   filterSchemeId,
           sectorId:   filterSectorId,
+          regionId:   filterRegionId,
           divisionId: filterDivisionId,
           status:     filterStatus,
         },
@@ -326,6 +330,24 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   };
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+
+  /**
+   * Single-project snapshot download (Task 4 — MD-only backend route).
+   * Shares busy/error state with the portfolio export so the header
+   * "Exporting…" pill covers both flows.
+   */
+  const runSnapshot = async (format: ProjectSnapshotFormat): Promise<void> => {
+    if (!activeProjectId) return;
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      await downloadProjectSnapshot({ projectId: activeProjectId, format, accessToken });
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Snapshot export failed.');
+    } finally {
+      setExportBusy(false);
+    }
+  };
   const [openPicker, setOpenPicker]           = useState<null | 'kpi' | 'cols' | 'proj'>(null);
   const [colSearch, setColSearch]             = useState('');
   const [kpiSearch, setKpiSearch]             = useState('');
@@ -354,6 +376,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
           limit: 100,
           ...(filterSchemeId   ? { schemeId:   filterSchemeId   } : {}),
           ...(filterSectorId   ? { sectorId:   filterSectorId   } : {}),
+          ...(filterRegionId   ? { regionId:   filterRegionId   } : {}),
           ...(filterDivisionId ? { divisionId: filterDivisionId } : {}),
           ...(filterStatus     ? { status:     filterStatus     } : {}),
         }
@@ -402,7 +425,7 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   // filtered out of view).
   useEffect(() => {
     setActiveProjectId(null);
-  }, [filterSchemeId, filterSectorId, filterDivisionId, filterStatus]);
+  }, [filterSchemeId, filterSectorId, filterRegionId, filterDivisionId, filterStatus]);
 
   // ── Draggable divider handlers ──
   const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent): void => {
@@ -470,7 +493,8 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     : null;
   const hasAnyFilter =
     filterSchemeId !== null || filterSectorId !== null ||
-    filterDivisionId !== null || filterStatus !== null;
+    filterRegionId !== null || filterDivisionId !== null ||
+    filterStatus !== null;
   const hitCap = projects.length >= 100;
 
   const districtsById = useMemo(() => {
@@ -767,6 +791,28 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                     >
                       ← Back to KPIs
                     </button>
+                    {/* Snapshot export buttons — one per format for
+                        discoverability (only 2 formats, dropdown would be
+                        heavier than 2 direct buttons). Shared exportBusy
+                        state disables both while a download is in-flight. */}
+                    <button
+                      type="button"
+                      onClick={() => void runSnapshot('pdf')}
+                      disabled={exportBusy}
+                      title="Download this project's snapshot as PDF"
+                      className="rounded-md border border-[#1E3A5F] bg-white px-2 py-1 text-[10.5px] font-semibold text-[#1E3A5F] hover:bg-[#F0F4F8] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      📄 PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void runSnapshot('xlsx')}
+                      disabled={exportBusy}
+                      title="Download this project's snapshot as Excel (import-template shape)"
+                      className="rounded-md border border-[#059669] bg-white px-2 py-1 text-[10.5px] font-semibold text-[#059669] hover:bg-[#ECFDF5] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      📊 Excel
+                    </button>
                     <button
                       type="button"
                       onClick={() => setOpenPicker(openPicker === 'proj' ? null : 'proj')}
@@ -990,20 +1036,29 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
               />
             ) : null}
 
-            {/* Filter row — Scheme, Sector, Division, Status */}
+            {/* Filter row — Scheme, Sector, Region, Division, Status */}
             <FilterRow
               lookups={lookupsQuery.data}
               filterSchemeId={filterSchemeId}
               filterSectorId={filterSectorId}
+              filterRegionId={filterRegionId}
               filterDivisionId={filterDivisionId}
               filterStatus={filterStatus}
               onSchemeChange={setFilterSchemeId}
               onSectorChange={setFilterSectorId}
+              onRegionChange={(rid) => {
+                setFilterRegionId(rid);
+                // If a division is picked that isn't in the new region, clear it.
+                if (rid !== null && filterDivisionId !== null) {
+                  const d = lookupsQuery.data?.divisions.find((x) => x.divisionId === filterDivisionId);
+                  if (!d || d.regionId !== rid) setFilterDivisionId(null);
+                }
+              }}
               onDivisionChange={setFilterDivisionId}
               onStatusChange={setFilterStatus}
               onClearAll={() => {
                 setFilterSchemeId(null); setFilterSectorId(null);
-                setFilterDivisionId(null); setFilterStatus(null);
+                setFilterRegionId(null); setFilterDivisionId(null); setFilterStatus(null);
               }}
               hasAnyFilter={hasAnyFilter}
             />
@@ -1548,19 +1603,22 @@ function ProgressRow({ label, value, color }: {
   );
 }
 
-// ── FilterRow — Scheme / Sector / Division / Status dropdowns ───────────────
+// ── FilterRow — Scheme / Sector / Region / Division / Status dropdowns ─────
 function FilterRow({
-  lookups, filterSchemeId, filterSectorId, filterDivisionId, filterStatus,
-  onSchemeChange, onSectorChange, onDivisionChange, onStatusChange,
+  lookups,
+  filterSchemeId, filterSectorId, filterRegionId, filterDivisionId, filterStatus,
+  onSchemeChange, onSectorChange, onRegionChange, onDivisionChange, onStatusChange,
   onClearAll, hasAnyFilter,
 }: {
   lookups: Lookups | undefined;
   filterSchemeId: number | null;
   filterSectorId: number | null;
+  filterRegionId: number | null;
   filterDivisionId: number | null;
   filterStatus: string | null;
   onSchemeChange:   (v: number | null) => void;
   onSectorChange:   (v: number | null) => void;
+  onRegionChange:   (v: number | null) => void;
   onDivisionChange: (v: number | null) => void;
   onStatusChange:   (v: string | null) => void;
   onClearAll: () => void;
@@ -1568,7 +1626,13 @@ function FilterRow({
 }): JSX.Element {
   const schemes   = lookups?.schemes   ?? [];
   const sectors   = lookups?.sectors   ?? [];
+  const regions   = lookups?.regions   ?? [];
   const divisions = lookups?.divisions ?? [];
+  // Division dropdown narrows if a Region is chosen (mirrors the same
+  // hierarchy the Projects Register filter bar uses).
+  const filteredDivisions = filterRegionId !== null
+    ? divisions.filter((d) => d.regionId === filterRegionId)
+    : divisions;
   return (
     <div className="shrink-0 border-b border-[#E5E7EB] bg-white px-4 py-3">
       <div className="flex flex-wrap items-end gap-2">
@@ -1585,10 +1649,16 @@ function FilterRow({
           options={sectors.map((s) => ({ value: String(s.sectorId), label: s.sectorName }))}
         />
         <FilterSelect
+          label="Region"
+          value={filterRegionId === null ? '' : String(filterRegionId)}
+          onChange={(v) => onRegionChange(v ? Number(v) : null)}
+          options={regions.map((r) => ({ value: String(r.regionId), label: r.regionName }))}
+        />
+        <FilterSelect
           label="Division"
           value={filterDivisionId === null ? '' : String(filterDivisionId)}
           onChange={(v) => onDivisionChange(v ? Number(v) : null)}
-          options={divisions.map((d) => ({ value: String(d.divisionId), label: d.divisionName }))}
+          options={filteredDivisions.map((d) => ({ value: String(d.divisionId), label: d.divisionName }))}
         />
         <FilterSelect
           label="Status"
