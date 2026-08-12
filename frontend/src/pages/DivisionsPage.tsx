@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useGetDivisionSummaryQuery,
   useGetRegionSummaryQuery,
@@ -22,6 +23,7 @@ type SortKey = 'total' | 'delayed' | 'completion' | 'name';
  * remains unchanged per the user's "keep district, add division alongside".
  */
 export function DivisionsPage(): JSX.Element {
+  const navigate = useNavigate();
   const regions = useGetRegionSummaryQuery();
   const summary = useGetDivisionSummaryQuery();
   const [regionFilter, setRegionFilter] = useState<number | null>(null);
@@ -195,9 +197,11 @@ export function DivisionsPage(): JSX.Element {
               }
               active={false}
               onClick={() => {
-                // No client-side drill-in modal yet — divisions are new. Deep-link
-                // to the project register with a division filter instead.
-                window.location.assign(`/projects?divisionId=${row.divisionId}`);
+                // Client-side navigation (React Router) — full-page reloads
+                // via window.location on Vercel used to 404 for anyone
+                // without the SPA-fallback rewrite; navigate() is the
+                // correct SPA pattern regardless of host config.
+                navigate(`/projects?divisionId=${row.divisionId}`);
               }}
             />
           ))}

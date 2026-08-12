@@ -4,6 +4,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://buidco-api.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!api/|assets/|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|map|txt|xml|woff2?|ttf|json)$).*)",
+      "destination": "/index.html"
     }
   ]
 }
