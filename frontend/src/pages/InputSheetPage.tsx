@@ -9,7 +9,10 @@ import {
   useUpdateProjectMutation,
 } from '../app/api/projectsApi';
 import { useAppSelector } from '../app/hooks';
-import { selectCurrentUser } from '../features/auth/authSlice';
+import { selectAccessToken, selectCurrentUser } from '../features/auth/authSlice';
+import {
+  downloadBlankTemplate,
+} from '../app/api/projectImportExportApi';
 import { RoleGate } from '../components/auth/RoleGate';
 import { ActionRemarksSection } from '../components/input-sheet/ActionRemarksSection';
 import { BasicInfoSection } from '../components/input-sheet/BasicInfoSection';
@@ -19,6 +22,7 @@ import { GeoTaggingSection } from '../components/input-sheet/GeoTaggingSection';
 import { OmDetailsSection } from '../components/input-sheet/OmDetailsSection';
 import { PhaseDatesSection } from '../components/input-sheet/PhaseDatesSection';
 import { ProgressFinancialSection } from '../components/input-sheet/ProgressFinancialSection';
+import { ImportProjectsModal } from '../components/projects/ImportProjectsModal';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
@@ -81,6 +85,25 @@ export function InputSheetPage(): JSX.Element {
   const isEdit = Boolean(projectId);
   const navigate = useNavigate();
   const currentUser = useAppSelector(selectCurrentUser);
+  const accessToken = useAppSelector(selectAccessToken);
+
+  // Bulk-import controls live in the page header (Exporting.md §Import
+  // Options). Modal state + template-download busy/error kept local.
+  const canImport = currentUser?.role === 'MD' || currentUser?.role === 'Admin';
+  const [importOpen, setImportOpen] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const runDownloadTemplate = async (): Promise<void> => {
+    setTemplateError(null);
+    setTemplateBusy(true);
+    try {
+      await downloadBlankTemplate(accessToken);
+    } catch (e) {
+      setTemplateError(e instanceof Error ? e.message : 'Template download failed.');
+    } finally {
+      setTemplateBusy(false);
+    }
+  };
   // MD bypasses granular flags (matches backend requireProjectCreate/Update).
   const canCreate = currentUser?.role === 'MD' || Boolean(currentUser?.canCreateProjects);
   const canUpdate = currentUser?.role === 'MD' || Boolean(currentUser?.canUpdateProjects);
@@ -243,7 +266,30 @@ export function InputSheetPage(): JSX.Element {
                 ) : null}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Bulk-import + template download live here (Exporting.md
+                  §Import Options). Hidden for PD/Viewer since backend
+                  requires MD/Admin for the POST /projects/import route. */}
+              {canImport ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setImportOpen(true)}
+                    disabled={busy}
+                    title="Upload a filled BUIDCO Input Sheet template to create many projects at once"
+                  >
+                    📥 Import Projects…
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void runDownloadTemplate()}
+                    disabled={templateBusy}
+                    title="Download the blank BUIDCO Input Sheet template"
+                  >
+                    {templateBusy ? 'Downloading…' : '📄 Download Template'}
+                  </Button>
+                </>
+              ) : null}
               <Button
                 onClick={handleSave}
                 disabled={busy || !canSave}
@@ -436,6 +482,30 @@ export function InputSheetPage(): JSX.Element {
             </NavLink>
           )}
         </footer>
+
+        {templateError ? (
+          <div role="alert" className="rounded border border-[#FCA5A5] bg-[#FEF2F2] px-3 py-2 text-[12px] font-medium text-[#B91C1C]">
+            {templateError}
+            <button
+              type="button"
+              onClick={() => setTemplateError(null)}
+              className="ml-2 text-[10px] font-bold uppercase tracking-wider text-[#7F1D1D] hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
+        {canImport ? (
+          <ImportProjectsModal
+            open={importOpen}
+            onClose={() => setImportOpen(false)}
+            onImported={() => {
+              // Success — projects were created, no state to refetch here
+              // (Projects Register + Input Sheet fetch independently).
+            }}
+          />
+        ) : null}
       </article>
     </RoleGate>
   );

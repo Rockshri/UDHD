@@ -354,9 +354,17 @@ interface ProjectsTableProps {
   rows: ProjectListItem[];
   lookups: Lookups | undefined;
   isFetching?: boolean;
+  /** Multi-select for export flow (Exporting.md §5). Optional — undefined
+   *  disables the checkbox column entirely, preserving legacy callers. */
+  selectedIds?: Set<string>;
+  onToggleOne?: (projectId: string, next: boolean) => void;
+  onToggleAllOnPage?: (rowIds: string[], next: boolean) => void;
 }
 
-export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps): JSX.Element {
+export function ProjectsTable({
+  rows, lookups, isFetching,
+  selectedIds, onToggleOne, onToggleAllOnPage,
+}: ProjectsTableProps): JSX.Element {
   const [visibility, setVisibility] = useState<Record<string, boolean>>(() => loadVisibility());
   const [showPicker, setShowPicker] = useState(false);
   const [sortKey, setSortKey] = useState<string>('sno');
@@ -381,6 +389,16 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
   }, [lookups]);
 
   const visibleColumns = COLUMNS.filter((c) => visibility[c.key] !== false);
+  // Multi-select is "on" only when a selectedIds Set was passed. That way
+  // legacy callers with no selection props render the table as before.
+  const selectMode = selectedIds !== undefined;
+  const pageRowIds = rows.map((r) => r.projectId);
+  const pageAllSelected = selectMode && pageRowIds.length > 0
+    ? pageRowIds.every((id) => selectedIds!.has(id))
+    : false;
+  const pageSomeSelected = selectMode
+    ? pageRowIds.some((id) => selectedIds!.has(id))
+    : false;
   const toggle = (key: string): void => {
     setVisibility((prev) => {
       const next = { ...prev, [key]: !(prev[key] !== false) };
@@ -475,6 +493,21 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
         <table className="w-full min-w-[960px] border-collapse text-xs">
           <thead className="bg-[#F9FAFB]">
             <tr>
+              {selectMode ? (
+                <th
+                  scope="col"
+                  className="sticky top-0 z-10 w-[38px] border-b border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 text-center"
+                >
+                  <input
+                    type="checkbox"
+                    aria-label="Select all rows on this page"
+                    checked={pageAllSelected}
+                    ref={(el) => { if (el) el.indeterminate = pageSomeSelected && !pageAllSelected; }}
+                    onChange={(e) => onToggleAllOnPage?.(pageRowIds, e.target.checked)}
+                    className="h-3.5 w-3.5 cursor-pointer accent-[#1E3A5F]"
+                  />
+                </th>
+              ) : null}
               {visibleColumns.map((c) => (
                 <th
                   key={c.key}
@@ -504,42 +537,62 @@ export function ProjectsTable({ rows, lookups, isFetching }: ProjectsTableProps)
           <tbody>
             {sortedRows.length === 0 ? (
               <tr>
-                <td colSpan={visibleColumns.length} className="px-3 py-10 text-center text-[#6B7280]">
+                <td colSpan={visibleColumns.length + (selectMode ? 1 : 0)} className="px-3 py-10 text-center text-[#6B7280]">
                   No projects match your filters.
                 </td>
               </tr>
             ) : (
-              sortedRows.map((row, i) => (
-                <tr
-                  key={row.projectId}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setProfileProjectId(row.projectId)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setProfileProjectId(row.projectId);
-                    }
-                  }}
-                  className="cursor-pointer border-b border-[#F3F4F6] hover:bg-[#F0F7FF] focus:bg-[#EFF6FF] focus:outline-none"
-                >
-                  {visibleColumns.map((c) => (
-                    <td
-                      key={c.key}
-                      className={cn(
-                        'whitespace-nowrap px-3 py-2 align-middle text-[12px] text-[#374151]',
-                        c.align === 'right'
-                          ? 'text-right'
-                          : c.align === 'center'
-                            ? 'text-center'
-                            : 'text-left',
-                      )}
-                    >
-                      {c.render(row, i, ctx)}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              sortedRows.map((row, i) => {
+                const isSelected = selectMode ? selectedIds!.has(row.projectId) : false;
+                return (
+                  <tr
+                    key={row.projectId}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setProfileProjectId(row.projectId)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setProfileProjectId(row.projectId);
+                      }
+                    }}
+                    className={cn(
+                      'cursor-pointer border-b border-[#F3F4F6] hover:bg-[#F0F7FF] focus:bg-[#EFF6FF] focus:outline-none',
+                      isSelected && 'bg-[#EFF6FF]',
+                    )}
+                  >
+                    {selectMode ? (
+                      <td
+                        className="w-[38px] px-3 py-2 text-center align-middle"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${row.projectName}`}
+                          checked={isSelected}
+                          onChange={(e) => onToggleOne?.(row.projectId, e.target.checked)}
+                          className="h-3.5 w-3.5 cursor-pointer accent-[#1E3A5F]"
+                        />
+                      </td>
+                    ) : null}
+                    {visibleColumns.map((c) => (
+                      <td
+                        key={c.key}
+                        className={cn(
+                          'whitespace-nowrap px-3 py-2 align-middle text-[12px] text-[#374151]',
+                          c.align === 'right'
+                            ? 'text-right'
+                            : c.align === 'center'
+                              ? 'text-center'
+                              : 'text-left',
+                        )}
+                      >
+                        {c.render(row, i, ctx)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

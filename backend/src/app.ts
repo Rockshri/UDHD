@@ -11,6 +11,7 @@ import { kpisRouter } from './routes/kpis.js';
 import { lookupsRouter } from './routes/lookups.js';
 import { mdBriefingExportRouter } from './routes/mdBriefingExport.js';
 import { momRouter } from './routes/mom.js';
+import { projectImportExportRouter } from './routes/projectImportExport.js';
 import { preMonsoonRouter } from './routes/preMonsoon.js';
 import { projectsRouter } from './routes/projects.js';
 import { uploadsRouter } from './routes/uploads.js';
@@ -34,6 +35,10 @@ export function createApp(): Express {
   app.use('/api/auth', authRouter);
   app.use('/api/lookups', lookupsRouter);
   app.use('/api/kpis', kpisRouter);
+  // Import/export endpoints MUST mount BEFORE projectsRouter so their
+  // static paths (/template.xlsx, /import, /export) aren't caught by the
+  // dynamic `GET /:projectId` route inside projectsRouter.
+  app.use('/api/projects', projectImportExportRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api/mom', momRouter);
   app.use('/api/pre-monsoon', preMonsoonRouter);
