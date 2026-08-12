@@ -9,6 +9,13 @@
  *   GET  /api/projects/export?format=…      → filtered export
  */
 
+import { env } from '../../env';
+
+// Same base URL RTK Query uses. On Vercel this may point directly at the
+// Render backend (bypassing the /api rewrite), so relative "/api/..." paths
+// silently 404. Route every export/import through the env-configured base.
+const API = env.VITE_API_BASE_URL.replace(/\/$/, '');
+
 export type ExportFormat = 'xlsx' | 'pdf' | 'pptx';
 
 export interface ExportFilters {
@@ -25,7 +32,7 @@ export interface ExportFilters {
 // ─── Blank template ──────────────────────────────────────────────────────
 
 export async function downloadBlankTemplate(accessToken: string | null): Promise<void> {
-  const res = await fetch('/api/projects/template.xlsx', {
+  const res = await fetch(`${API}/projects/template.xlsx`, {
     method: 'GET',
     headers: authHeaders(accessToken),
     credentials: 'include',
@@ -61,7 +68,7 @@ export async function downloadProjectsExport(opts: DownloadExportOpts): Promise<
     if (f.schemeId !== undefined)    params.set('schemeId',     String(f.schemeId));
   }
 
-  const res = await fetch(`/api/projects/export?${params.toString()}`, {
+  const res = await fetch(`${API}/projects/export?${params.toString()}`, {
     method: 'GET',
     headers: authHeaders(opts.accessToken),
     credentials: 'include',
@@ -107,7 +114,7 @@ interface ImportOpts {
 export async function uploadImport(opts: ImportOpts): Promise<ImportSummary> {
   const form = new FormData();
   form.append('file', opts.file);
-  const res = await fetch(`/api/projects/import?mode=${opts.mode}`, {
+  const res = await fetch(`${API}/projects/import?mode=${opts.mode}`, {
     method: 'POST',
     body: form,
     headers: authHeaders(opts.accessToken), // Content-Type auto-set by FormData

@@ -9,6 +9,12 @@
  * `requireRole('MD')`) — non-MD callers will see a 403.
  */
 
+import { env } from '../../env';
+
+// Same base URL RTK Query uses (see baseQuery.ts). Bypasses the Vercel
+// /api rewrite when that isn't in play — direct-to-Render on prod.
+const API = env.VITE_API_BASE_URL.replace(/\/$/, '');
+
 export type MdBriefingFormat = 'xlsx' | 'pdf' | 'pptx';
 
 /** Same 5 filters the MdSchemeSummaryModal exposes. */
@@ -42,7 +48,7 @@ export async function downloadMdBriefing({ format, filters, accessToken }: Downl
   const headers: Record<string, string> = {};
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-  const res = await fetch(`/api/md-briefing/export?${params.toString()}`, {
+  const res = await fetch(`${API}/md-briefing/export?${params.toString()}`, {
     method: 'GET',
     headers,
     credentials: 'include',
@@ -82,7 +88,7 @@ interface SnapshotOpts {
 export async function downloadProjectSnapshot({ projectId, format, accessToken }: SnapshotOpts): Promise<void> {
   const headers: Record<string, string> = {};
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-  const url = `/api/projects/${encodeURIComponent(projectId)}/snapshot?format=${format}`;
+  const url = `${API}/projects/${encodeURIComponent(projectId)}/snapshot?format=${format}`;
   const res = await fetch(url, { method: 'GET', headers, credentials: 'include' });
   if (!res.ok) {
     let msg = `Snapshot export failed (HTTP ${res.status})`;
