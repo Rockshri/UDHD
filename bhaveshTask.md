@@ -1,87 +1,51 @@
-Task 1 — Analyze the Complete Project
-Analyze the entire project end-to-end before making any changes.
-Implement all the requirements mentioned below.
-Preserve the existing UI, design, architecture, functionality, and project data.
-Do not break or modify any unrelated functionality or existing projects.
-Make only the necessary changes required for these tasks.
-Task 2 — Sector: Blocks, Tables & Column Filters
-Navigate to Sector from the left-side panel.
-Make the following 5 blocks clickable:
-Sectors
-Projects
-Completed
-In Progress
-Delayed
-When the user clicks any block, display the corresponding table directly below the selected block/section.
-Check whether an existing Filter button is present in the table.
-If present, remove the existing Filter button.
-Implement a Table Column Filter for the table, allowing users to filter data independently from each column.
-Task 3 — Schemes: Fix Data Bug & Add Column Filters
-Navigate to Schemes from the left-side panel.
-Fix the existing bug where the Schemes and Projects tables are displaying the same details.
-Ensure that each section displays its correct and relevant data.
-Make the required blocks clickable.
-When any block is clicked, display the corresponding table below it.
-Check whether an existing Filter button is present.
-If present, remove it.
-Add a Table Column Filter to the table so users can filter data column-wise.
-Task 4 — Division: Remove Block & Add Column Filters
-Navigate to Division from the left-side panel.
-Remove the “Division with Projects” block.
-Keep the remaining 3 blocks unchanged.
-Make all 3 remaining blocks clickable.
-When any block is clicked, display the corresponding table below it.
-Check whether an existing Filter button is present in the table.
-If present, remove it.
-Add a Table Column Filter to the table.
-Task 5 — CoS/EoT: Replace Existing Filter
-Navigate to CoS/EoT from the left-side panel.
-Check the table for any existing Filter button.
-If the Filter button exists, remove it.
-Implement a Table Column Filter for the table.
-Ensure filtering works independently for each column.
-Task 6 — Management Action: Add Action & Column Filters
-Navigate to Management Action from the left-side panel.
-Add an “Add Action” button.
-When the user clicks Add Action, open a dialog/card containing all required fields/details for creating a management action.
-Add the submitted management action data to the database.
-Ensure proper validation and successful data submission.
-After adding the action, ensure the newly added data is reflected in the table without breaking existing functionality.
-Check whether an existing Filter button is present.
-If present, remove it.
-Add a Table Column Filter to the table.
-Task 7 — O&M: Add Column Filters
-Navigate to O&M from the top navigation bar.
-Check whether the table contains an existing Filter button.
-If present, remove it.
-Implement a Table Column Filter for the table.
-Ensure each column can be filtered independently.
-Preserve all existing O&M functionality.
-Final Validation
-Test all modified sections end-to-end.
-Verify that all clickable blocks display the correct corresponding table.
-Verify that Schemes and Projects no longer display duplicate/wrong data.
-Verify that all Table Column Filters work correctly.
-Verify that the Add Action functionality saves data correctly to the database.
-Ensure existing projects, data, UI, navigation, permissions, and unrelated functionality remain unaffected.
-Task 8 — Add Customizable Fields, Table Column Filter & Download Options to All Tables
-Add a Customizable Fields button to the corner of all applicable tables.
-Follow the same Customizable Fields functionality and UI pattern already available in the Projects section of the sidebar.
-Users should be able to select/deselect the required columns according to their requirements.
-The table should update dynamically based on the selected/deselected fields.
-Along with Customizable Fields, provide a Table Column Filter for each table.
-The Table Column Filter should allow users to filter data independently for each column.
-Add a Download/Export button at the corner of all applicable tables.
-The Download button should provide three formats:
-PDF
-Excel
-PPT
-The downloaded file should respect the user's selected Customizable Fields and applied Table Column Filters.
-For example:
-If the user selects only 5 fields through Customizable Fields, only those 5 fields should be included in the download.
-If the user applies a column filter, the downloaded data should reflect the filtered results.
-Maintain the same UI, functionality, format, and behavior as the existing Projects sidebar table wherever applicable.
-Ensure the existing Projects sidebar Customizable Fields, Filter, and Download functionality remains unchanged.
-Implement these features without affecting any other existing functionality or project data.
-
-okey
+Task 1: Analyze the Complete Project Before Implementation
+Analyze the entire project end-to-end, including frontend, backend, database, existing workflows, and related project functionality.
+Implement all the changes mentioned below without affecting any existing functionality, design, data, permissions, or project-related features.
+Make only the necessary changes and ensure existing modules continue to work as expected.
+Task 2: Correct Sector Dashboard Data Display
+Navigate to Sector from the left-side panel and analyze the current behavior.
+Currently, the Sector block and Projects block are displaying the same table data.
+Update the functionality so that:
+Clicking the Sector block displays sector-specific data in the table.
+The table should contain the appropriate sector-level details instead of project-level data.
+Clicking the Projects block should continue to display project-related data as it currently does.
+Ensure that the existing table design, filters, pagination, and other functionality remain unaffected.
+Task 3: Add Import Project and Download Template Functionality
+Navigate to Input Sheet → Add New Project.
+Beside the existing Create Project button, add two new buttons:
+Import Project
+Download Template
+3.1 Download Template
+Use the Excel template provided at:
+C:\Users\spine\OneDrive\Desktop\Buidco\UDHD\frontend\src\assets
+When the user clicks Download Template, download the provided Excel template directly.
+The downloaded template must retain the same structure, headers, formatting, and required fields as the source template.
+Do not create a different template if the provided template can be reused.
+3.2 Import Project
+Add functionality to upload an Excel file through the Import Project button.
+The uploaded Excel file must follow the same structure and format as the Download Template.
+Validate the uploaded Excel file before creating any project.
+3.3 Mandatory Field Validation
+Check all mandatory fields required for creating a project.
+Compare the required project fields with the columns/data provided in the uploaded Excel file.
+Validate that:
+All mandatory columns are present.
+Mandatory fields contain valid data.
+The uploaded file follows the expected template structure.
+Invalid or missing data is clearly identified.
+3.4 Project Creation and Database Saving
+If all mandatory fields are present and valid:
+Process the Excel data.
+Create the project(s) using the imported data.
+Save the project data into the existing database.
+Use the existing project-creation logic wherever possible to avoid duplicate or inconsistent functionality.
+If any mandatory field/column is missing or invalid:
+Do not create the incomplete project.
+Display a clear error message identifying the missing/invalid required field(s).
+Clearly inform the user which required fields need to be filled before importing again.
+3.5 Import Validation and Existing Functionality
+Ensure imported projects follow the same validations, business rules, permissions, and database structure as projects created manually through Create Project.
+Handle Excel upload errors gracefully.
+Prevent duplicate or partial project creation if the import fails validation.
+Ensure existing Create Project, Input Sheet, project listing, filtering, downloading, and other application functionality is not affected.
+Test the complete flow from Download Template → Fill Excel → Import Project → Validate → Create Project → Save to Database → Display Project.

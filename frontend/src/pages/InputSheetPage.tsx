@@ -16,6 +16,7 @@ import { BasicInfoSection } from '../components/input-sheet/BasicInfoSection';
 import { ContractSecuritySection } from '../components/input-sheet/ContractSecuritySection';
 import { CosEotSection } from '../components/input-sheet/CosEotSection';
 import { GeoTaggingSection } from '../components/input-sheet/GeoTaggingSection';
+import { ImportProjectDialog } from '../components/input-sheet/ImportProjectDialog';
 import { OmDetailsSection } from '../components/input-sheet/OmDetailsSection';
 import { PhaseDatesSection } from '../components/input-sheet/PhaseDatesSection';
 import { ProgressFinancialSection } from '../components/input-sheet/ProgressFinancialSection';
@@ -23,6 +24,7 @@ import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 import { draftToPayload, useProjectDraft } from '../hooks/useProjectDraft';
+import templateUrl from '../assets/Template.xlsx';
 
 type SectionId =
   | 'basic'
@@ -101,6 +103,7 @@ export function InputSheetPage(): JSX.Element {
   const [createProject, createState] = useCreateProjectMutation();
   const [updateProject, updateState] = useUpdateProjectMutation();
 
+  const [importOpen, setImportOpen] = useState(false);
   const [section, setSection] = useState<SectionId>('basic');
   // Open on the ALL Fields group by default — it renders every section in
   // sequential order and is the fastest way to scan the whole form.
@@ -194,7 +197,7 @@ export function InputSheetPage(): JSX.Element {
       fallback={
         <div className="rounded-lg border border-[#FCA5A5] bg-[#FEF2F2] p-4 text-sm">
           <p className="font-semibold text-[#B91C1C]">
-            You don't have permission to edit projects.
+            You don&apos;t have permission to edit projects.
           </p>
           <p className="mt-1 text-[#6B7280]">Viewer role is read-only for the Input Sheet.</p>
           <NavLink to="/projects" className="mt-2 inline-block text-[#1D4ED8] hover:underline">
@@ -243,7 +246,26 @@ export function InputSheetPage(): JSX.Element {
                 ) : null}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {!isEdit ? (
+                <>
+                  <a
+                    href={templateUrl}
+                    download="BUIDCO_Project_Import_Template.xlsx"
+                    className="inline-flex h-9 items-center justify-center rounded border border-[#D1D5DB] bg-white px-4 text-sm font-medium text-[#374151] transition-colors hover:bg-[#F9FAFB]"
+                  >
+                    ⬇ Download Template
+                  </a>
+                  <Button
+                    variant="outline"
+                    onClick={() => setImportOpen(true)}
+                    disabled={!canSave}
+                    title={!canSave ? 'Your account cannot create projects. Ask an Admin.' : undefined}
+                  >
+                    ⬆ Import Project
+                  </Button>
+                </>
+              ) : null}
               <Button
                 onClick={handleSave}
                 disabled={busy || !canSave}
@@ -437,6 +459,8 @@ export function InputSheetPage(): JSX.Element {
           )}
         </footer>
       </article>
+
+      {importOpen ? <ImportProjectDialog onClose={() => setImportOpen(false)} /> : null}
     </RoleGate>
   );
 }

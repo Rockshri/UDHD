@@ -9,6 +9,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // .xlsx isn't in Vite's built-in asset-extension list, so without this
+    // it tries to parse the Task 3 Download Template file as JS. Treat it
+    // as a plain static asset (import gives back a URL) like any image.
+    assetsInclude: ['**/*.xlsx'],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

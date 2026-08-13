@@ -157,3 +157,13 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 export const updateProjectSchema = createProjectSchema.partial();
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
+/**
+ * Task 3 (bhaveshTask.md) — Import Project. Each item is validated against
+ * the exact same rules as a manual Create Project; the cap matches the
+ * Excel template's row allowance and keeps a single import request bounded.
+ */
+export const importProjectsSchema = z.object({
+  items: z.array(createProjectSchema).min(1).max(200),
+});
+export type ImportProjectsInput = z.infer<typeof importProjectsSchema>;

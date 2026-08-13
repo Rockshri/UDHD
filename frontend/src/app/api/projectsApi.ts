@@ -68,6 +68,17 @@ export const projectsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'ProjectList', id: 'LIST' }, 'Kpis'],
     }),
 
+    /**
+     * Task 3 (bhaveshTask.md) — Import Project. `items` are already
+     * validated and name-resolved client-side (Sector/Division/Scheme(s))
+     * from the uploaded Excel file into the same shape createProject sends;
+     * the server re-validates and inserts all rows in one transaction.
+     */
+    importProjects: build.mutation<ItemsResponse<ProjectDetail>, { items: ProjectUpsertPayload[] }>({
+      query: (body) => ({ url: 'projects/import', method: 'POST', body }),
+      invalidatesTags: [{ type: 'ProjectList', id: 'LIST' }, 'Kpis'],
+    }),
+
     updateProject: build.mutation<
       ProjectDetail,
       { projectId: string; body: ProjectUpsertPayload }
@@ -157,6 +168,7 @@ export const {
   useLazyListProjectsQuery,
   useGetProjectQuery,
   useCreateProjectMutation,
+  useImportProjectsMutation,
   useUpdateProjectMutation,
   useDeleteProjectMutation,
   useGetPhysicalHistoryQuery,

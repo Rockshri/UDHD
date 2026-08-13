@@ -4,7 +4,11 @@ import { DrillTable } from '../components/summary/DrillTable';
 import { SummaryCard } from '../components/summary/SummaryCard';
 import { Card, CardContent } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
+import { ColumnFilterText, textMatches, minMatches } from '../components/ui/ColumnFilter';
+import { ColumnsButton, ExportButton, useColumnVisibility, type ToolbarColumn } from '../components/ui/TableToolbar';
+import { useTableExport, type ExportColumn, type ExportFormat } from '../lib/tableExport';
 import { cn } from '../lib/utils';
+import type { SectorSummaryRow } from '../types/api';
 
 const CARD_COLORS = [
   '#1E3A5F',
@@ -19,7 +23,7 @@ const CARD_COLORS = [
 type MetricKey = 'sectors' | 'projects' | 'completed' | 'inProgress' | 'delayed';
 
 const METRIC_LABELS: Record<MetricKey, string> = {
-  sectors: 'All projects — across all sectors',
+  sectors: 'All sectors',
   projects: 'All projects',
   completed: 'Completed projects',
   inProgress: 'In-progress projects',
@@ -114,7 +118,12 @@ export function SectorsPage(): JSX.Element {
         />
       </div>
 
-      {activeMetric ? (
+      {activeMetric === 'sectors' ? (
+        // Bug fix (Task 2, round 2): this used to render the exact same
+        // unfiltered DrillTable as "Projects", so the two blocks showed
+        // identical rows. "Sectors" now shows sector-level rows instead.
+        <SectorsTable items={summary.data?.items ?? []} onClose={() => setActiveMetric(null)} />
+      ) : activeMetric ? (
         <DrillTable
           {...(METRIC_STATUS[activeMetric] ? { status: METRIC_STATUS[activeMetric] } : {})}
           labelOfContext={METRIC_LABELS[activeMetric]}
@@ -206,5 +215,182 @@ function Metric({
         {value}
       </div>
     </button>
+  );
+}
+
+interface SectorColFilters {
+  name: string;
+  minTotal: string;
+  minCompleted: string;
+  minDelayed: string;
+}
+const EMPTY_SECTOR_FILTERS: SectorColFilters = { name: '', minTotal: '', minCompleted: '', minDelayed: '' };
+
+const SECTOR_COLUMNS: ToolbarColumn[] = [
+  { key: 'sector', label: 'Sector' },
+  { key: 'total', label: 'Total' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'inProgress', label: 'In Progress' },
+  { key: 'delayed', label: 'Delayed' },
+];
+const SECTOR_STORAGE_KEY = 'buidco.sectorsTable.columns.v1';
+
+const SECTOR_EXPORT_COLUMNS: ExportColumn<SectorSummaryRow>[] = [
+  { key: 'sector', label: 'Sector', exportValue: (r) => r.sectorName },
+  { key: 'total', label: 'Total', align: 'right', exportValue: (r) => r.total },
+  { key: 'completed', label: 'Completed', align: 'right', exportValue: (r) => r.completed },
+  { key: 'inProgress', label: 'In Progress', align: 'right', exportValue: (r) => r.inProgress },
+  { key: 'delayed', label: 'Delayed', align: 'right', exportValue: (r) => r.delayed },
+];
+
+/**
+ * Sector-level rows (name + status rollup) — the "Sectors" block's detail
+ * table. Distinct from DrillTable (which lists individual projects) so it
+ * no longer duplicates what "Projects" shows.
+ */
+function SectorsTable({
+  items,
+  onClose,
+}: {
+  items: SectorSummaryRow[];
+  onClose: () => void;
+}): JSX.Element {
+  const [colFilters, setColFilters] = useState<SectorColFilters>(EMPTY_SECTOR_FILTERS);
+  const setCol = <K extends keyof SectorColFilters>(key: K, value: string): void =>
+    setColFilters((prev) => ({ ...prev, [key]: value }));
+  const anyActive = Object.values(colFilters).some((v) => v.trim() !== '');
+
+  const { visibility, isVisible, toggle, showAll, hideAll } = useColumnVisibility(SECTOR_STORAGE_KEY, SECTOR_COLUMNS);
+  const { exporting, error: exportError, run } = useTableExport<SectorSummaryRow>();
+
+  const filtered = useMemo(() => {
+    return items.filter(
+      (r) =>
+        textMatches(colFilters.name, r.sectorName) &&
+        minMatches(colFilters.minTotal, r.total) &&
+        minMatches(colFilters.minCompleted, r.completed) &&
+        minMatches(colFilters.minDelayed, r.delayed),
+    );
+  }, [items, colFilters]);
+
+  const visibleColumnCount = SECTOR_COLUMNS.filter((c) => isVisible(c.key)).length;
+
+  const runExport = (format: ExportFormat): void => {
+    void run(
+      format,
+      SECTOR_EXPORT_COLUMNS.filter((c) => isVisible(c.key)),
+      filtered,
+      { title: 'BUIDCO - Sector Summary', sheetName: 'Sectors', fileNamePrefix: 'Sectors' },
+    );
+  };
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2">
+        <div className="text-[13px] font-bold text-[#111827]">
+          All sectors
+          <span className="ml-2 text-[12px] font-normal text-[#6B7280]">
+            — {filtered.length} of {items.length} sector{items.length !== 1 ? 's' : ''}
+          </span>
+          {exportError ? <span className="ml-2 text-[12px] font-normal text-[#B91C1C]">{exportError}</span> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          {anyActive ? (
+            <button
+              type="button"
+              onClick={() => setColFilters(EMPTY_SECTOR_FILTERS)}
+              className="text-[11px] font-semibold text-[#B91C1C] hover:underline"
+            >
+              Clear column filters
+            </button>
+          ) : null}
+          <ColumnsButton
+            columns={SECTOR_COLUMNS}
+            visibility={visibility}
+            onToggle={toggle}
+            onShowAll={showAll}
+            onHideAll={hideAll}
+          />
+          <ExportButton onExport={runExport} exporting={exporting} />
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[18px] leading-none text-[#9CA3AF] hover:text-[#B91C1C]"
+            aria-label="Close drill-in"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+      {items.length === 0 ? (
+        <div className="p-6 text-center text-[12.5px] text-[#6B7280]">No sectors configured yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse text-[12.5px]">
+            <thead>
+              <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
+                {isVisible('sector') ? (
+                  <th className="px-3 py-2 text-left align-top">
+                    <div>Sector</div>
+                    <ColumnFilterText value={colFilters.name} onChange={(v) => setCol('name', v)} />
+                  </th>
+                ) : null}
+                {isVisible('total') ? (
+                  <th className="px-3 py-2 text-right align-top">
+                    <div>Total</div>
+                    <ColumnFilterText value={colFilters.minTotal} onChange={(v) => setCol('minTotal', v)} placeholder="≥" align="right" />
+                  </th>
+                ) : null}
+                {isVisible('completed') ? (
+                  <th className="px-3 py-2 text-right align-top">
+                    <div>Completed</div>
+                    <ColumnFilterText value={colFilters.minCompleted} onChange={(v) => setCol('minCompleted', v)} placeholder="≥" align="right" />
+                  </th>
+                ) : null}
+                {isVisible('inProgress') ? <th className="px-3 py-2 text-right align-top">In Progress</th> : null}
+                {isVisible('delayed') ? (
+                  <th className="px-3 py-2 text-right align-top">
+                    <div>Delayed</div>
+                    <ColumnFilterText value={colFilters.minDelayed} onChange={(v) => setCol('minDelayed', v)} placeholder="≥" align="right" />
+                  </th>
+                ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={visibleColumnCount} className="px-3 py-6 text-center text-[#6B7280]">
+                    No sectors match the current column filters.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((r, idx) => (
+                  <tr
+                    key={r.sectorId}
+                    className={cn('border-b border-[#F3F4F6]', idx % 2 === 1 && 'bg-[#FAFAFA]')}
+                  >
+                    {isVisible('sector') ? (
+                      <td className="px-3 py-2 font-semibold text-[#1D4ED8]">{r.sectorName}</td>
+                    ) : null}
+                    {isVisible('total') ? (
+                      <td className="px-3 py-2 text-right tabular-nums text-[#111827]">{r.total}</td>
+                    ) : null}
+                    {isVisible('completed') ? (
+                      <td className="px-3 py-2 text-right tabular-nums text-[#15803D]">{r.completed}</td>
+                    ) : null}
+                    {isVisible('inProgress') ? (
+                      <td className="px-3 py-2 text-right tabular-nums text-[#1D4ED8]">{r.inProgress}</td>
+                    ) : null}
+                    {isVisible('delayed') ? (
+                      <td className="px-3 py-2 text-right tabular-nums text-[#B91C1C]">{r.delayed}</td>
+                    ) : null}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

@@ -302,15 +302,14 @@ function stripSchemesFromPatch(input: CreateProjectInput | UpdateProjectInput): 
   return { schemes, fields: rest };
 }
 
-export async function createProject(
-  input: CreateProjectInput,
-  actor: AuditActor,
-  pdDivisionId: number | null = null,
-): Promise<ProjectDetail> {
-  // Creating a project necessarily sets Basic Info + Contract & Security
-  // fields (Fixed Inputs). Per the Input Sheet split, only MD/Admin may
-  // change those, so a non-MD/Admin create is blocked outright even if
-  // their canCreateProjects flag happens to be on.
+/**
+ * Guard shared by single-create and bulk-import: creating a project
+ * necessarily sets Basic Info + Contract & Security fields (Fixed Inputs).
+ * Per the Input Sheet split, only MD/Admin may change those, so a
+ * non-MD/Admin create is blocked outright even if their canCreateProjects
+ * flag happens to be on.
+ */
+function assertActorCanCreate(actor: AuditActor): void {
   if (actor.role !== 'MD' && actor.role !== 'Admin') {
     throw new HttpError(
       403,
@@ -318,7 +317,20 @@ export async function createProject(
       'Only MD or Admin can create new projects (Basic Info + Contract & Security are Fixed Inputs).',
     );
   }
+}
 
+/**
+ * Inserts one project row + its scheme links + audit entry, using whatever
+ * executor the caller passes (a bare `db` or a `tx` from `db.transaction`).
+ * Shared by `createProject` (own transaction) and `createProjectsBulk` (one
+ * shared transaction across every row, so the whole import is all-or-nothing).
+ */
+async function insertProjectRow(
+  exec: DbExecutor,
+  input: CreateProjectInput,
+  actor: AuditActor,
+  pdDivisionId: number | null,
+): Promise<string> {
   const projectId = randomUUID();
   const { schemes, fields } = stripSchemesFromPatch(input);
   // Phase C2 — PDs create projects only in their own division; any client-
@@ -331,32 +343,66 @@ export async function createProject(
   // error rather than a raw Postgres integrity violation.
   reconcileTenderStageOnCreate(fields as Partial<Project>);
 
-  await db.transaction(async (tx) => {
-    const [inserted] = await tx
-      .insert(project)
-      .values({ ...(fields as Partial<Project>), projectId, projectName: input.projectName })
-      .returning();
-    if (!inserted) throw new Error('project insert did not return a row');
+  const [inserted] = await exec
+    .insert(project)
+    .values({ ...(fields as Partial<Project>), projectId, projectName: input.projectName })
+    .returning();
+  if (!inserted) throw new Error('project insert did not return a row');
 
-    if (schemes && schemes.length > 0) {
-      await tx.insert(projectScheme).values(schemes.map((schemeId) => ({ projectId, schemeId })));
-    }
+  if (schemes && schemes.length > 0) {
+    await exec.insert(projectScheme).values(schemes.map((schemeId) => ({ projectId, schemeId })));
+  }
 
-    const changes = diffProject({}, {
-      ...(inserted as unknown as Record<string, unknown>),
-      schemes: schemes ?? [],
-    });
-
-    await recordAudit(tx, {
-      actor,
-      action: 'Created',
-      projectId,
-      projectNameSnapshot: inserted.projectName,
-      changes,
-    });
+  const changes = diffProject({}, {
+    ...(inserted as unknown as Record<string, unknown>),
+    schemes: schemes ?? [],
   });
 
+  await recordAudit(exec, {
+    actor,
+    action: 'Created',
+    projectId,
+    projectNameSnapshot: inserted.projectName,
+    changes,
+  });
+
+  return projectId;
+}
+
+export async function createProject(
+  input: CreateProjectInput,
+  actor: AuditActor,
+  pdDivisionId: number | null = null,
+): Promise<ProjectDetail> {
+  assertActorCanCreate(actor);
+  let projectId = '';
+  await db.transaction(async (tx) => {
+    projectId = await insertProjectRow(tx, input, actor, pdDivisionId);
+  });
   return getProject(projectId);
+}
+
+/**
+ * Task 3 (bhaveshTask.md) — Import Project. Creates every row inside ONE
+ * transaction so a failure partway through (e.g. a bad FK that slipped past
+ * validation) rolls back the entire batch rather than leaving a partial set
+ * of projects behind. Uses the exact same insert/audit path as a single
+ * manual Create Project, so imported projects are indistinguishable from
+ * manually-created ones.
+ */
+export async function createProjectsBulk(
+  inputs: CreateProjectInput[],
+  actor: AuditActor,
+  pdDivisionId: number | null = null,
+): Promise<ProjectDetail[]> {
+  assertActorCanCreate(actor);
+  const projectIds: string[] = [];
+  await db.transaction(async (tx) => {
+    for (const input of inputs) {
+      projectIds.push(await insertProjectRow(tx, input, actor, pdDivisionId));
+    }
+  });
+  return Promise.all(projectIds.map((id) => getProject(id)));
 }
 
 export async function updateProject(

@@ -2,7 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { actorFromReq, sessionDivisionId } from '../lib/actor.js';
 import * as kpi from '../lib/kpi.js';
-import { createProjectSchema, updateProjectSchema } from '../lib/projectFields.js';
+import { createProjectSchema, importProjectsSchema, updateProjectSchema } from '../lib/projectFields.js';
 import {
   requireAuth,
   requireProjectCreate,
@@ -12,6 +12,7 @@ import {
 import {
   assertPdCanAccessProject,
   createProject,
+  createProjectsBulk,
   deleteProject,
   getProject,
   listProjects,
@@ -80,6 +81,25 @@ projectsRouter.post('/tender-transfer', requireProjectUpdate, async (req, res, n
       sessionDivisionId(req),
     );
     res.json(out);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Task 3 (bhaveshTask.md) — Import Project. Body is already
+ * mapped/name-resolved client-side from the uploaded Excel file into the
+ * same shape as a manual Create Project; re-validated here with the exact
+ * same schema (defense in depth) and inserted as one all-or-nothing
+ * transaction so a bad row can't leave a partial batch behind. Registered
+ * *before* the `/:projectId` PD guard so this literal path isn't parsed as
+ * a UUID (same reasoning as `/tender-transfer` above).
+ */
+projectsRouter.post('/import', requireProjectCreate, async (req, res, next) => {
+  try {
+    const body = importProjectsSchema.parse(req.body);
+    const out = await createProjectsBulk(body.items, actorFromReq(req), sessionDivisionId(req));
+    res.status(201).json({ items: out });
   } catch (err) {
     next(err);
   }
