@@ -168,6 +168,7 @@ export function ProjectsPage(): JSX.Element {
         }}
         activeCount={activeCount}
         totalRows={filteredItems.length}
+        totalMatching={query.data?.total}
       />
 
       {query.isLoading ? (
@@ -190,6 +191,9 @@ export function ProjectsPage(): JSX.Element {
             <span>
               {cursor ? 'On next page — ' : 'Page 1 — '}
               showing {filteredItems.length} row{filteredItems.length === 1 ? '' : 's'}
+              {typeof query.data?.total === 'number'
+                ? ` of ${query.data.total} total`
+                : ''}
               {selectionCount > 0 ? ` · ${selectionCount} selected across pages` : ''}.
             </span>
             <div className="flex items-center gap-2">

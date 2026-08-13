@@ -111,7 +111,7 @@ export async function listProjects(
    * regardless of what's in `q` — PDs can't broaden scope via query params.
    */
   pdDivisionId: number | null = null,
-): Promise<{ items: ProjectListItem[]; nextCursor: string | null }> {
+): Promise<{ items: ProjectListItem[]; nextCursor: string | null; total: number }> {
   const filters = [] as ReturnType<typeof eq>[];
   if (q.status) filters.push(eq(project.status, q.status));
   // Phase A §3.2 — the UI's "Project Stage" filter targets the new column.
@@ -127,15 +127,17 @@ export async function listProjects(
   }
   if (q.sectorId) filters.push(eq(project.sectorId, q.sectorId));
 
-  if (q.cursor) {
-    const c = decodeCursor(q.cursor);
-    filters.push(
-      or(
-        lt(project.createdAt, new Date(c.createdAt)),
-        and(eq(project.createdAt, new Date(c.createdAt)), lt(project.projectId, c.id)),
-      )!,
-    );
-  }
+  // Split cursor out so the total count reflects the whole filtered set,
+  // not just rows after the cursor.
+  const cursorClause = q.cursor
+    ? (() => {
+        const c = decodeCursor(q.cursor);
+        return or(
+          lt(project.createdAt, new Date(c.createdAt)),
+          and(eq(project.createdAt, new Date(c.createdAt)), lt(project.projectId, c.id)),
+        )!;
+      })()
+    : undefined;
 
   // Region filter: pass through to project.divisionId via a subquery join,
   // since the project table has no region_id column of its own.
@@ -159,9 +161,10 @@ export async function listProjects(
                     AND ps.scheme_id = ${q.schemeId})`
     : undefined;
 
-  const whereClauses = [...filters, searchClause, schemeJoin, regionClause].filter(
+  const nonCursorClauses = [...filters, searchClause, schemeJoin, regionClause].filter(
     (c): c is NonNullable<typeof c> => c !== undefined,
   );
+  const whereClauses = cursorClause ? [...nonCursorClauses, cursorClause] : nonCursorClauses;
 
   const rows = await db
     .select({
@@ -174,6 +177,12 @@ export async function listProjects(
     .where(whereClauses.length > 0 ? and(...whereClauses) : undefined)
     .orderBy(desc(project.createdAt), desc(project.projectId))
     .limit(q.limit + 1);
+
+  const totalRows = await db
+    .select({ n: sql<number>`COUNT(*)::int` })
+    .from(project)
+    .where(nonCursorClauses.length > 0 ? and(...nonCursorClauses) : undefined);
+  const total = Number(totalRows[0]?.n ?? 0);
 
   const pageRows = rows.slice(0, q.limit);
   const pageIds = pageRows.map((r) => r.p.projectId);
@@ -209,7 +218,7 @@ export async function listProjects(
     }
   }
 
-  return { items, nextCursor };
+  return { items, nextCursor, total };
 }
 
 /* ============================================================

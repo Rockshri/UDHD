@@ -766,6 +766,9 @@ export interface AuditItem {
 export interface CursorPage<T> {
   items: T[];
   nextCursor: string | null;
+  /** Total across the filtered set (not just this page). Optional so
+   *  older backend responses without this field still typecheck. */
+  total?: number;
 }
 
 export interface OffsetPage<T> {

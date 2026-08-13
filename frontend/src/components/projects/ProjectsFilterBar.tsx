@@ -12,6 +12,7 @@ interface Props {
   clearAll: () => void;
   activeCount: number;
   totalRows: number | undefined;
+  totalMatching?: number | undefined;
 }
 
 const STATUSES = ['Not Started', 'In Progress', 'Completed', 'On Hold', 'Delayed'];
@@ -26,6 +27,7 @@ export function ProjectsFilterBar({
   clearAll,
   activeCount,
   totalRows,
+  totalMatching,
 }: Props): JSX.Element {
   const { data: lookups } = useGetLookupsQuery();
   const currentUser = useAppSelector(selectCurrentUser);
@@ -152,6 +154,12 @@ export function ProjectsFilterBar({
               <>
                 {' '}
                 · <span className="font-semibold tabular-nums">{totalRows}</span> shown
+                {typeof totalMatching === 'number' && totalMatching !== totalRows ? (
+                  <>
+                    {' '}
+                    of <span className="font-semibold tabular-nums">{totalMatching}</span>
+                  </>
+                ) : null}
               </>
             ) : null}
           </span>
