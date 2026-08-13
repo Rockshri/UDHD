@@ -5,7 +5,11 @@
  * in a transaction and recording success in `__migrations`. Idempotent —
  * re-running skips migrations already recorded.
  *
- * Usage:  npm run db:migrate
+ * Usage:
+ *   - CLI:      `npm run db:migrate`
+ *   - Server:   `await runMigrations()` inside src/server.ts, before
+ *               `app.listen`, so a fresh Render deploy always ends up
+ *               with the schema the code expects.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -16,8 +20,11 @@ import { env } from '../env.js';
 
 const { Client } = pg;
 
-async function run(): Promise<void> {
+export async function runMigrations(): Promise<void> {
   const here = dirname(fileURLToPath(import.meta.url));
+  // Repo layout: <root>/backend/{src,dist}/db/migrate.ts → migrations at
+  // <root>/backend/drizzle. Same resolve() in src and dist because both
+  // sit two levels below the drizzle folder.
   const migrationsDir = resolve(here, '..', '..', 'drizzle');
 
   const files = readdirSync(migrationsDir)
@@ -73,8 +80,19 @@ async function run(): Promise<void> {
   }
 }
 
-run().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});
+// Only run automatically when this file is invoked as a CLI script
+// (e.g. `npm run db:migrate`) — NOT when imported by src/server.ts.
+const invokedDirectly = (() => {
+  if (!process.argv[1]) return false;
+  const entry = resolve(process.argv[1]);
+  const self = fileURLToPath(import.meta.url);
+  return entry === self;
+})();
+
+if (invokedDirectly) {
+  runMigrations().catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  });
+}
