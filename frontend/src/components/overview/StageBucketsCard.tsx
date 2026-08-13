@@ -94,7 +94,7 @@ export function StageBucketsCard(): JSX.Element {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {STAGES.map((s) => (
               <Skeleton key={s.key} className="h-24 w-full" />
             ))}
@@ -105,7 +105,7 @@ export function StageBucketsCard(): JSX.Element {
           <EmptyPipeline />
         ) : (
           <>
-            <ol className="grid gap-2 sm:grid-cols-5">
+            <ol className="grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               {STAGES.map((stage, idx) => {
                 const bucket = byStage.get(stage.key);
                 const count = bucket?.count ?? 0;
@@ -182,8 +182,11 @@ export function StageBucketsCard(): JSX.Element {
                       </p>
                     </NavLink>
                     {idx < STAGES.length - 1 ? (
+                      // Arrow only makes sense in the 5-col pipeline view.
+                      // Below lg the tiles wrap to 2/3 columns and an arrow
+                      // pointing right would misdirect at every row break.
                       <span
-                        className="pointer-events-none absolute right-[-13px] top-1/2 hidden -translate-y-1/2 text-lg font-bold text-[#CBD5E1] sm:block"
+                        className="pointer-events-none absolute right-[-13px] top-1/2 hidden -translate-y-1/2 text-lg font-bold text-[#CBD5E1] lg:block"
                         aria-hidden
                       >
                         →

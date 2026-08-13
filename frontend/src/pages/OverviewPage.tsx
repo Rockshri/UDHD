@@ -56,14 +56,14 @@ export function OverviewPage(): JSX.Element {
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#111827]">
+          <h1 className="text-xl font-bold tracking-tight text-[#111827] sm:text-2xl">
             Welcome{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}
           </h1>
-          <p className="mt-0.5 text-sm text-[#6B7280]">
+          <p className="mt-0.5 text-xs text-[#6B7280] sm:text-sm">
             Portfolio-wide view of every project managed by BUIDCO.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CustomizePopover visibility={visibility} />
           <Button variant="outline" size="sm" onClick={refetchAll} disabled={anyFetching}>
             <span className={anyFetching ? 'animate-spin' : ''} aria-hidden>
@@ -75,7 +75,7 @@ export function OverviewPage(): JSX.Element {
       </div>
 
       {overview.isLoading ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-24 w-full" />
           ))}
@@ -96,10 +96,10 @@ export function OverviewPage(): JSX.Element {
       ) : null}
 
       {showChartsRow ? (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {showSchemeChart ? (
             <Card className="lg:col-span-2">
-              <CardHeader className="flex-row items-center justify-between">
+              <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                 <CardTitle>Physical vs Financial % by Scheme</CardTitle>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
                   Click a bar to filter
@@ -107,7 +107,7 @@ export function OverviewPage(): JSX.Element {
               </CardHeader>
               <CardContent>
                 {scheme.isLoading ? (
-                  <Skeleton className="h-[300px] w-full" />
+                  <Skeleton className="h-[260px] w-full sm:h-[300px]" />
                 ) : scheme.error ? (
                   <p className="text-sm text-[#B91C1C]">Could not load scheme chart.</p>
                 ) : (
@@ -119,7 +119,7 @@ export function OverviewPage(): JSX.Element {
 
           {showStatusDonut ? (
             <Card>
-              <CardHeader className="flex-row items-center justify-between">
+              <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                 <CardTitle>Status Breakdown</CardTitle>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
                   Click a slice to filter
@@ -127,7 +127,7 @@ export function OverviewPage(): JSX.Element {
               </CardHeader>
               <CardContent>
                 {donut.isLoading ? (
-                  <Skeleton className="h-[260px] w-full" />
+                  <Skeleton className="h-[220px] w-full sm:h-[260px]" />
                 ) : donut.error ? (
                   <p className="text-sm text-[#B91C1C]">Could not load status data.</p>
                 ) : (

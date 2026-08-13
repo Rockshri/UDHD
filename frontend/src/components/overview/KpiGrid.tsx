@@ -26,7 +26,7 @@ export function KpiGrid({ data, visibility }: KpiGridProps): JSX.Element | null 
   return (
     <section aria-label="Portfolio KPIs" className="space-y-3">
       {row1 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6">
           {v('kpi.total') ? (
             <StatCard
               label="Total Projects"
@@ -91,7 +91,7 @@ export function KpiGrid({ data, visibility }: KpiGridProps): JSX.Element | null 
       ) : null}
 
       {row2 ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           {v('kpi.sanctioned') ? (
             <StatCard
               label="Total Sanctioned"

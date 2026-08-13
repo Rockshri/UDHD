@@ -1,6 +1,7 @@
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import type { StatusDonutRow } from '../../types/api';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 const STATUS_COLORS: Record<string, string> = {
   Completed: '#15803D',
@@ -18,25 +19,28 @@ export function StatusDonut({ data }: StatusDonutProps): JSX.Element {
   const navigate = useNavigate();
   const cleaned = data.filter((d) => d.projectCount > 0);
   const total = cleaned.reduce((acc, d) => acc + d.projectCount, 0);
+  const isMobile = useMediaQuery('(max-width: 639px)');
+  const innerR = isMobile ? 48 : 60;
+  const outerR = isMobile ? 82 : 100;
 
   if (cleaned.length === 0) {
     return (
-      <div className="flex h-[240px] items-center justify-center text-sm text-[#6B7280]">
+      <div className="flex h-[220px] items-center justify-center text-sm text-[#6B7280] sm:h-[240px]">
         No status data yet.
       </div>
     );
   }
 
   return (
-    <div className="relative h-[280px] w-full">
+    <div className="relative h-[240px] w-full sm:h-[280px]">
       <ResponsiveContainer>
         <PieChart>
           <Pie
             data={cleaned}
             dataKey="projectCount"
             nameKey="status"
-            innerRadius={60}
-            outerRadius={100}
+            innerRadius={innerR}
+            outerRadius={outerR}
             paddingAngle={2}
             onClick={(entry: unknown) => {
               const row = entry as { payload?: StatusDonutRow };
