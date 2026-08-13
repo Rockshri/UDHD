@@ -13,7 +13,7 @@ export function KpiGrid({ data }: KpiGridProps): JSX.Element {
     <section aria-label="Portfolio KPIs" className="space-y-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
-          label="Total Projects"
+          label="Active Major Projects"
           value={formatInteger(data?.total)}
           hint="All portfolios"
           tone="brand"
