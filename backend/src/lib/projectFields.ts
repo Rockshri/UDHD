@@ -131,6 +131,7 @@ export const createProjectSchema = z.object({
   geoTaggingUrl: z.string().url().nullable().optional(),
 
   remark: textField(),
+  tenderRemark: textField(),
 
   omApplicable: z.boolean().optional(),
   omStartDate: dateField(),

@@ -150,6 +150,10 @@ export const project = pgTable(
     geoTaggingUrl: text('geo_tagging_url'),
 
     remark: text('remark'),
+    /** Tender-sub-stage remark ("why this project is stuck"). Overwritten
+     *  when the project moves to a different sub-stage. A non-empty value
+     *  blocks tender-transfer per the enhancement spec §1.3. */
+    tenderRemark: text('tender_remark'),
     /** @deprecated Legacy free-text column; write to management_action_item instead. */
     managementActionLegacy: text('management_action_legacy'),
 

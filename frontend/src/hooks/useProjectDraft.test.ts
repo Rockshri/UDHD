@@ -35,6 +35,7 @@ function makeDetail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     expectedCompletionRaw: null,
     pbgExpiryDate: '2026-08-01',
     remark: null,
+    tenderRemark: null,
     omApplicable: false,
     omStartDate: null,
     omPeriodMonths: null,

@@ -4,6 +4,7 @@ import {
   useGetProjectQuery,
   useListProjectsQuery,
   useTransferTenderMutation,
+  useUpdateProjectMutation,
   useUpdateProjectNitMutation,
 } from '../../app/api/projectsApi';
 import { useAppSelector } from '../../app/hooks';
@@ -140,6 +141,21 @@ export function TenderDashboardModal({ open, onClose }: Props): JSX.Element | nu
         });
         return;
       }
+    }
+    // Tender_Dashboard_Division.md §1.3 — a filled remark means the project
+    // is stuck; block the transfer (both directions) until it's cleared.
+    const stuck = tenderProjects
+      .filter((p) => selectedIds.has(p.projectId))
+      .filter((p) => (p.tenderRemark ?? '').trim() !== '');
+    if (stuck.length > 0) {
+      setFlash({
+        text:
+          stuck.length === 1
+            ? `Clear the Remark on "${stuck[0]!.projectName}" before transferring — a non-empty remark marks the project as stuck.`
+            : `Clear the Remark on ${stuck.length} selected projects before transferring — non-empty remarks mark those projects as stuck.`,
+        kind: 'err',
+      });
+      return;
     }
     try {
       const result = await transferTender({
@@ -587,7 +603,7 @@ function StagesTab({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-[12px]">
+            <table className="w-full min-w-[1080px] border-collapse text-[12px]">
               <thead>
                 <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
                   <th className="w-8 px-2 py-2">
@@ -603,6 +619,7 @@ function StagesTab({
                       <span className="sr-only">NIT actions</span>
                     </th>
                   ) : null}
+                  <th className="px-3 py-2 text-left">Remark</th>
                   <th className="px-3 py-2 text-left">Last Updated</th>
                 </tr>
               </thead>
@@ -617,6 +634,7 @@ function StagesTab({
                     disableCheckbox={!canTransfer || busy}
                     isNitPublished={stagesActive === 'NIT Published'}
                     canEditNit={canTransfer}
+                    canEditRemark={canTransfer}
                   />
                 ))}
               </tbody>
@@ -640,7 +658,7 @@ function StagesTab({
 
 function StageProjectRow({
   project, lookups, checked, onToggle, disableCheckbox,
-  isNitPublished, canEditNit,
+  isNitPublished, canEditNit, canEditRemark,
 }: {
   project: ProjectListItem;
   lookups: Lookups | undefined;
@@ -649,14 +667,18 @@ function StageProjectRow({
   disableCheckbox: boolean;
   isNitPublished: boolean;
   canEditNit: boolean;
+  canEditRemark: boolean;
 }): JSX.Element {
   const division = project.divisionId
     ? lookups?.divisions.find((d) => d.divisionId === project.divisionId)?.divisionName ?? '—'
     : '—';
   const [updateNit, nitState] = useUpdateProjectNitMutation();
+  const [updateProject, projectState] = useUpdateProjectMutation();
   const [nitNumber, setNitNumber] = useState<string>(project.nitNumber ?? '');
   const [nitDate, setNitDate] = useState<string>(project.nitDate ?? '');
+  const [remark, setRemark] = useState<string>(project.tenderRemark ?? '');
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [remarkErr, setRemarkErr] = useState<string | null>(null);
 
   // Server value can shift under us (e.g. after a bulk transfer refetch or
   // audit tag invalidation). Re-hydrate the row's local edits from the
@@ -666,8 +688,13 @@ function StageProjectRow({
     setNitDate(project.nitDate ?? '');
   }, [project.nitNumber, project.nitDate]);
 
+  useEffect(() => {
+    setRemark(project.tenderRemark ?? '');
+  }, [project.tenderRemark]);
+
   const dirty =
     (project.nitNumber ?? '') !== nitNumber || (project.nitDate ?? '') !== nitDate;
+  const remarkDirty = (project.tenderRemark ?? '') !== remark;
 
   const handleSave = async (): Promise<void> => {
     setSaveErr(null);
@@ -681,6 +708,18 @@ function StageProjectRow({
       }).unwrap();
     } catch (err) {
       setSaveErr(readError(err));
+    }
+  };
+
+  const handleSaveRemark = async (): Promise<void> => {
+    setRemarkErr(null);
+    try {
+      await updateProject({
+        projectId: project.projectId,
+        body: { tenderRemark: remark.trim() === '' ? null : remark },
+      }).unwrap();
+    } catch (err) {
+      setRemarkErr(readError(err));
     }
   };
 
@@ -762,6 +801,54 @@ function StageProjectRow({
           </div>
         </td>
       ) : null}
+
+      {/* Remark cell — free-text, per-project. Non-empty blocks tender-transfer
+          per Tender_Dashboard_Division.md §1.3. Cleared on stage change. */}
+      <td className="px-3 py-2 align-top">
+        <div className="flex flex-col items-start gap-1">
+          <textarea
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            placeholder={canEditRemark ? 'Why is this stuck?' : '—'}
+            rows={2}
+            className={cn(
+              'w-56 rounded border bg-white px-2 py-1 text-[11.5px] disabled:cursor-not-allowed disabled:bg-[#F9FAFB]',
+              (project.tenderRemark ?? '').trim() !== ''
+                ? 'border-[#F59E0B]'
+                : 'border-[#D1D5DB]',
+            )}
+            disabled={!canEditRemark || projectState.isLoading}
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => void handleSaveRemark()}
+              disabled={!canEditRemark || projectState.isLoading || !remarkDirty}
+              title={
+                !canEditRemark
+                  ? 'Read-only — needs Update Projects permission'
+                  : !remarkDirty
+                    ? 'No changes to save'
+                    : undefined
+              }
+            >
+              {projectState.isLoading ? 'Saving…' : remarkDirty ? 'Save' : '✓ Saved'}
+            </Button>
+            {(project.tenderRemark ?? '').trim() !== '' ? (
+              <span
+                className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-[#B45309]"
+                title="Remark filled — this project cannot be transferred until the remark is cleared."
+              >
+                Stuck
+              </span>
+            ) : null}
+          </div>
+          {remarkErr ? (
+            <span className="text-[10.5px] text-[#B91C1C]">{remarkErr}</span>
+          ) : null}
+        </div>
+      </td>
 
       <td className="px-3 py-2 tabular-nums text-[#6B7280]">
         {project.lastUpdated ? formatDate(project.lastUpdated.slice(0, 10)) : '—'}

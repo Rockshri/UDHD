@@ -380,6 +380,8 @@ export interface ProjectListItem {
   expectedCompletionRaw: string | null;
   pbgExpiryDate: string | null;
   remark: string | null;
+  /** Tender sub-stage remark; non-empty means "stuck", blocks transfer. */
+  tenderRemark: string | null;
   omApplicable: boolean | null;
   omStartDate: string | null;
   omPeriodMonths: number | null;
@@ -494,6 +496,7 @@ export interface ProjectUpsertPayload {
   lastRaBillNo?: string | null;
   geoTaggingUrl?: string | null;
   remark?: string | null;
+  tenderRemark?: string | null;
   omApplicable?: boolean;
   omStartDate?: string | null;
   omPeriodMonths?: number | null;

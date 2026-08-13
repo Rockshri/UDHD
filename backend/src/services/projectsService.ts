@@ -651,6 +651,7 @@ export async function transferTenderSubStage(
         divisionId: project.divisionId,
         projectStageV2: project.projectStageV2,
         tenderSubStage: project.tenderSubStage,
+        tenderRemark: project.tenderRemark,
         nitNumber: project.nitNumber,
         nitDate: project.nitDate,
       })
@@ -709,10 +710,24 @@ export async function transferTenderSubStage(
         });
         continue;
       }
+      // Tender_Dashboard_Division.md §1.3 — a non-empty tender_remark
+      // means "this project is stuck for a reason". Clear the remark
+      // before you can move it (either direction).
+      const hasRemark = (row.tenderRemark ?? '').trim() !== '';
+      if (hasRemark) {
+        result.skipped.push({
+          projectId: row.projectId,
+          reason:
+            'Clear the Remark before transferring this project. A remark indicates the project is stuck at its current tender sub-stage.',
+        });
+        continue;
+      }
       const to = tenderSubStages[nextIdx] as TenderSubStage;
+      // Overwrite (clear) the tender_remark on stage change — per the
+      // single-current-remark decision, historical remarks aren't kept.
       await tx
         .update(project)
-        .set({ tenderSubStage: to })
+        .set({ tenderSubStage: to, tenderRemark: null })
         .where(eq(project.projectId, row.projectId));
 
       await recordAudit(tx, {
