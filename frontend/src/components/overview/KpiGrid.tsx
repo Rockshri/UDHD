@@ -26,7 +26,10 @@ export function KpiGrid({ data, visibility }: KpiGridProps): JSX.Element | null 
   return (
     <section aria-label="Portfolio KPIs" className="space-y-3">
       {row1 ? (
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6">
+        // auto-fit lets surviving cards stretch to fill the gap when the
+        // user hides some via the Customize popover. 150px min matches the
+        // narrowest a StatCard reads well at.
+        <div className="grid gap-2 sm:gap-3 grid-cols-[repeat(auto-fit,minmax(150px,1fr))]">
           {v('kpi.total') ? (
             <StatCard
               label="Total Projects"
@@ -91,7 +94,9 @@ export function KpiGrid({ data, visibility }: KpiGridProps): JSX.Element | null 
       ) : null}
 
       {row2 ? (
-        <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        // Money+contract cards carry longer values than the status row, so
+        // give them a bit more breathing room (180px min vs 150px).
+        <div className="grid gap-2 sm:gap-3 grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
           {v('kpi.sanctioned') ? (
             <StatCard
               label="Total Sanctioned"

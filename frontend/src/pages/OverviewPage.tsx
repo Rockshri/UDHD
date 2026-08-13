@@ -75,7 +75,7 @@ export function OverviewPage(): JSX.Element {
       </div>
 
       {overview.isLoading ? (
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-2 sm:gap-3 grid-cols-[repeat(auto-fit,minmax(150px,1fr))]">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-24 w-full" />
           ))}
@@ -89,16 +89,34 @@ export function OverviewPage(): JSX.Element {
       {v('panel.stageBuckets') ? <StageBucketsCard /> : null}
 
       {showScheduleFinRow ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        // Grid only splits when BOTH panels are visible — otherwise the
+        // survivor takes the full row instead of leaving a phantom gap.
+        <div
+          className={
+            showScheduleVsActual && showFinancialSecurities
+              ? 'grid gap-4 lg:grid-cols-2'
+              : 'grid gap-4'
+          }
+        >
           {showScheduleVsActual ? <ScheduleVsActualCard /> : null}
           {showFinancialSecurities ? <FinancialSecuritiesCard /> : null}
         </div>
       ) : null}
 
       {showChartsRow ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        // Three layouts depending on which chart(s) the user has enabled:
+        //   both  -> 3-col grid on lg (scheme 2/3 + donut 1/3), 2-col md
+        //   only scheme -> full-width single column (col-span dropped)
+        //   only donut  -> full-width single column
+        <div
+          className={
+            showSchemeChart && showStatusDonut
+              ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'
+              : 'grid gap-4'
+          }
+        >
           {showSchemeChart ? (
-            <Card className="lg:col-span-2">
+            <Card className={showStatusDonut ? 'lg:col-span-2' : ''}>
               <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                 <CardTitle>Physical vs Financial % by Scheme</CardTitle>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
@@ -140,14 +158,26 @@ export function OverviewPage(): JSX.Element {
       ) : null}
 
       {showSectorDivisionRow ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div
+          className={
+            showSector && showDivision
+              ? 'grid gap-4 lg:grid-cols-2'
+              : 'grid gap-4'
+          }
+        >
           {showSector ? <SectorSummaryCard /> : null}
           {showDivision ? <DivisionSummaryCard /> : null}
         </div>
       ) : null}
 
       {showAlertsRow ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div
+          className={
+            showPbgAlerts && showOmAlerts
+              ? 'grid gap-4 lg:grid-cols-2'
+              : 'grid gap-4'
+          }
+        >
           {showPbgAlerts ? <PbgAlertsCard /> : null}
           {showOmAlerts ? <OmAlertsCard /> : null}
         </div>
