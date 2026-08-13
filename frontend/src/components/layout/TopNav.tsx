@@ -196,7 +196,13 @@ function UserPill({
   loggingOut: boolean;
   onSignOut: () => Promise<void>;
 }): JSX.Element {
-  const displayName = user?.fullName || user?.username || '—';
+  // PDs display as `PD.<division_name lowercased>` (e.g. PD.darbhanga) so
+  // the pill immediately identifies which division the user is scoped to.
+  // Falls back to fullName / username if the division lookup hasn't loaded.
+  const displayName =
+    user?.role === 'PD' && divisionName
+      ? `PD.${divisionName.toLowerCase().replace(/\s+/g, '_')}`
+      : user?.fullName || user?.username || '—';
   const roleLabel = user ? (ROLE_DISPLAY[user.role] ?? user.role) : '—';
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
