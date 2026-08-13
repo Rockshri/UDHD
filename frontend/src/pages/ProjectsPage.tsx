@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Download } from 'lucide-react';
 import { useGetLookupsQuery } from '../app/api/lookupsApi';
 import { useListProjectsQuery, type ListProjectsQuery } from '../app/api/projectsApi';
 import {
@@ -9,8 +10,8 @@ import { selectAccessToken } from '../features/auth/authSlice';
 import { ProjectsFilterBar } from '../components/projects/ProjectsFilterBar';
 import { ProjectsTable } from '../components/projects/ProjectsTable';
 import { Button } from '../components/ui/button';
-import { HamburgerMenu, type MenuItem } from '../components/ui/HamburgerMenu';
 import { Skeleton } from '../components/ui/skeleton';
+import { cn } from '../lib/utils';
 import { useProjectFilters } from '../hooks/useProjectFilters';
 
 const PAGE_SIZE = 50;
@@ -109,37 +110,13 @@ export function ProjectsPage(): JSX.Element {
     return true;
   });
 
-  // Build hamburger menu — Export-only per spec (Import + Template live on
-  // Input Sheet). Adds "Export selected" section when a multi-select is
-  // active so the choice is contextual.
   const selectionCount = selectedIds.size;
-  const menuItems: MenuItem[] = [
-    ...(selectionCount > 0
-      ? [
-          {
-            type: 'submenu' as const,
-            label: `✅  Export selected (${selectionCount})`,
-            items: [
-              { type: 'action' as const, label: 'Excel (.xlsx)',       onClick: () => void runExportSelected('xlsx') },
-              { type: 'action' as const, label: 'PDF (.pdf)',           onClick: () => void runExportSelected('pdf') },
-              { type: 'action' as const, label: 'PowerPoint (.pptx)',   onClick: () => void runExportSelected('pptx') },
-            ],
-          },
-          { type: 'action' as const, label: `Clear selection (${selectionCount})`, onClick: clearSelection },
-          { type: 'divider' as const },
-        ]
-      : []),
-    {
-      type: 'submenu' as const,
-      label: '📤  Export current view',
-      // PPT dropped from this menu — project lists don't slide well.
-      // Multi-select "Export selected" still offers all 3 formats.
-      items: [
-        { type: 'action', label: 'Excel (.xlsx)', onClick: () => void runExport('xlsx') },
-        { type: 'action', label: 'PDF (.pdf)',     onClick: () => void runExport('pdf') },
-      ],
-    },
-  ];
+  // Selection is contextual: if rows are checked, Download exports ONLY
+  // those; otherwise it exports the current filtered view.
+  const handleDownload = (format: ExportFormat): void => {
+    if (selectionCount > 0) void runExportSelected(format);
+    else void runExport(format);
+  };
 
   return (
     <div className="space-y-4">
@@ -166,7 +143,16 @@ export function ProjectsPage(): JSX.Element {
           >
             ↻ Refresh
           </Button>
-          <HamburgerMenu items={menuItems} align="end" ariaLabel="Projects actions" />
+          {selectionCount > 0 ? (
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              Clear ({selectionCount})
+            </Button>
+          ) : null}
+          <DownloadMenu
+            onPick={handleDownload}
+            selectionCount={selectionCount}
+            busy={exportBusy}
+          />
         </div>
       </header>
 
@@ -238,5 +224,80 @@ export function ProjectsPage(): JSX.Element {
         </div>
       ) : null}
     </div>
+  );
+}
+
+interface DownloadMenuProps {
+  onPick: (format: ExportFormat) => void;
+  selectionCount: number;
+  busy: boolean;
+}
+
+function DownloadMenu({ onPick, selectionCount, busy }: DownloadMenuProps): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent): void => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const pick = (format: ExportFormat): void => {
+    setOpen(false);
+    onPick(format);
+  };
+
+  const label = selectionCount > 0 ? `Download (${selectionCount})` : 'Download';
+
+  return (
+    <div ref={rootRef} className="relative">
+      <Button
+        variant="default"
+        size="sm"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Download size={14} aria-hidden />
+        {busy ? 'Preparing…' : label}
+        <ChevronDown size={14} aria-hidden />
+      </Button>
+      {open ? (
+        <div
+          role="menu"
+          className={cn(
+            'absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-md border border-[#E5E7EB] bg-white shadow-lg',
+          )}
+        >
+          <MenuAction label="Excel (.xlsx)" onClick={() => pick('xlsx')} />
+          <MenuAction label="PDF (.pdf)"     onClick={() => pick('pdf')} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuAction({ label, onClick }: { label: string; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="block w-full px-3 py-2 text-left text-sm text-[#111827] hover:bg-[#F3F4F6]"
+    >
+      {label}
+    </button>
   );
 }

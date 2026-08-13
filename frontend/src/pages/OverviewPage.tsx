@@ -2,7 +2,7 @@ import { useGetOverviewKpisQuery, useGetSchemeChartQuery, useGetStatusDonutQuery
 import { useAppSelector } from '../app/hooks';
 import { SchemeBarChart } from '../components/charts/SchemeBarChart';
 import { StatusDonut } from '../components/charts/StatusDonut';
-import { DistrictSummaryCard } from '../components/overview/DistrictSummaryCard';
+import { DivisionSummaryCard } from '../components/overview/DivisionSummaryCard';
 import { FinancialSecuritiesCard } from '../components/overview/FinancialSecuritiesCard';
 import { KpiGrid } from '../components/overview/KpiGrid';
 import { OmAlertsCard } from '../components/overview/OmAlertsCard';
@@ -113,7 +113,7 @@ export function OverviewPage(): JSX.Element {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <SectorSummaryCard />
-        <DistrictSummaryCard />
+        <DivisionSummaryCard />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
