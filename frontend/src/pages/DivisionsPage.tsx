@@ -16,12 +16,12 @@ const CARD_COLORS = [
 
 type SortKey = 'total' | 'delayed' | 'completion' | 'name';
 
-/** The four portfolio-metric blocks (Task 2) — each drills into the
- *  matching slice of projects, shown below the blocks. */
-type MetricKey = 'divisionsWithProjects' | 'totalProjects' | 'completed' | 'delayed';
+/** The three portfolio-metric blocks (Task 4 — "Divisions with projects"
+ *  was removed) — each drills into the matching slice of projects, shown
+ *  below the blocks (DrillTable has its own per-column filters). */
+type MetricKey = 'totalProjects' | 'completed' | 'delayed';
 
 const METRIC_LABELS: Record<MetricKey, string> = {
-  divisionsWithProjects: 'All projects — divisions with projects',
   totalProjects: 'All projects',
   completed: 'Completed projects',
   delayed: 'Delayed projects',
@@ -46,20 +46,10 @@ export function DivisionsPage(): JSX.Element {
   const [search, setSearch] = useState('');
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
 
-  // Task 3 — Filter panel, applied together with (not instead of) sorting
-  // and the existing region/search filters above.
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [onlyWithProjects, setOnlyWithProjects] = useState(false);
-  const [onlyWithDelayed, setOnlyWithDelayed] = useState(false);
-  const [minCompletionPct, setMinCompletionPct] = useState('');
-  const activeFilterCount =
-    (onlyWithProjects ? 1 : 0) + (onlyWithDelayed ? 1 : 0) + (minCompletionPct.trim() ? 1 : 0);
-
   const items = summary.data?.items ?? [];
 
   const totals = useMemo(
     () => ({
-      divisions: items.filter((d) => d.total > 0).length,
       projects: items.reduce((s, r) => s + r.total, 0),
       completed: items.reduce((s, r) => s + r.completed, 0),
       delayed: items.reduce((s, r) => s + r.delayed, 0),
@@ -69,14 +59,8 @@ export function DivisionsPage(): JSX.Element {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const minCompletion = minCompletionPct.trim() ? Number(minCompletionPct) : null;
     let list = regionFilter ? items.filter((d) => d.regionId === regionFilter) : items;
     if (term) list = list.filter((d) => d.divisionName.toLowerCase().includes(term));
-    if (onlyWithProjects) list = list.filter((d) => d.total > 0);
-    if (onlyWithDelayed) list = list.filter((d) => d.delayed > 0);
-    if (minCompletion !== null && Number.isFinite(minCompletion)) {
-      list = list.filter((d) => (d.completionRatePct ?? -1) >= minCompletion);
-    }
     list = [...list].sort((a, b) => {
       if (sortKey === 'name') return a.divisionName.localeCompare(b.divisionName);
       if (sortKey === 'delayed') return b.delayed - a.delayed;
@@ -86,7 +70,7 @@ export function DivisionsPage(): JSX.Element {
       return b.total - a.total;
     });
     return list;
-  }, [items, search, sortKey, regionFilter, onlyWithProjects, onlyWithDelayed, minCompletionPct]);
+  }, [items, search, sortKey, regionFilter]);
 
   return (
     <article className="space-y-4">
@@ -162,16 +146,7 @@ export function DivisionsPage(): JSX.Element {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <Metric
-          label="Divisions with projects"
-          value={totals.divisions}
-          tone="brand"
-          active={activeMetric === 'divisionsWithProjects'}
-          onClick={() =>
-            setActiveMetric((k) => (k === 'divisionsWithProjects' ? null : 'divisionsWithProjects'))
-          }
-        />
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
         <Metric
           label="Total projects"
           value={totals.projects}
@@ -226,79 +201,6 @@ export function DivisionsPage(): JSX.Element {
             {s.label}
           </button>
         ))}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setFilterOpen((v) => !v)}
-            aria-pressed={filterOpen}
-            aria-expanded={filterOpen}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors',
-              filterOpen || activeFilterCount > 0
-                ? 'border-[#1E3A5F] bg-[#1E3A5F] text-white'
-                : 'border-[#D1D5DB] bg-white text-[#6B7280] hover:text-[#374151]',
-            )}
-          >
-            ▾ Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </button>
-          {filterOpen ? (
-            <div className="absolute left-0 top-full z-20 mt-1.5 w-72 rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-lg">
-              <div className="space-y-2.5">
-                <label className="flex items-center gap-2 text-[12px] text-[#374151]">
-                  <input
-                    type="checkbox"
-                    checked={onlyWithProjects}
-                    onChange={(e) => setOnlyWithProjects(e.target.checked)}
-                    className="cursor-pointer accent-[#1E3A5F]"
-                  />
-                  Only divisions with projects
-                </label>
-                <label className="flex items-center gap-2 text-[12px] text-[#374151]">
-                  <input
-                    type="checkbox"
-                    checked={onlyWithDelayed}
-                    onChange={(e) => setOnlyWithDelayed(e.target.checked)}
-                    className="cursor-pointer accent-[#1E3A5F]"
-                  />
-                  Only divisions with delayed projects
-                </label>
-                <label className="grid gap-1 text-[12px] text-[#374151]">
-                  Min completion %
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={minCompletionPct}
-                    onChange={(e) => setMinCompletionPct(e.target.value)}
-                    placeholder="e.g. 50"
-                    className="h-8 w-full rounded border border-[#D1D5DB] px-2 text-[12.5px]"
-                  />
-                </label>
-              </div>
-              <div className="mt-3 flex items-center justify-between border-t border-[#F3F4F6] pt-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOnlyWithProjects(false);
-                    setOnlyWithDelayed(false);
-                    setMinCompletionPct('');
-                  }}
-                  disabled={activeFilterCount === 0}
-                  className="text-[11px] font-semibold text-[#B91C1C] hover:underline disabled:cursor-not-allowed disabled:text-[#D1D5DB]"
-                >
-                  Clear filters
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterOpen(false)}
-                  className="rounded bg-[#1E3A5F] px-3 py-1 text-[11px] font-semibold text-white hover:bg-[#152a48]"
-                >
-                  Done ✓
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
