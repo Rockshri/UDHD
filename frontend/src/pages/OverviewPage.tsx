@@ -2,6 +2,7 @@ import { useGetOverviewKpisQuery, useGetSchemeChartQuery, useGetStatusDonutQuery
 import { useAppSelector } from '../app/hooks';
 import { SchemeBarChart } from '../components/charts/SchemeBarChart';
 import { StatusDonut } from '../components/charts/StatusDonut';
+import { CustomizePopover } from '../components/overview/CustomizePopover';
 import { DivisionSummaryCard } from '../components/overview/DivisionSummaryCard';
 import { FinancialSecuritiesCard } from '../components/overview/FinancialSecuritiesCard';
 import { KpiGrid } from '../components/overview/KpiGrid';
@@ -11,6 +12,7 @@ import { PbgExpiryBanner } from '../components/overview/PbgExpiryBanner';
 import { ScheduleVsActualCard } from '../components/overview/ScheduleVsActualCard';
 import { SectorSummaryCard } from '../components/overview/SectorSummaryCard';
 import { StageBucketsCard } from '../components/overview/StageBucketsCard';
+import { useOverviewVisibility } from '../components/overview/customization';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
@@ -21,6 +23,8 @@ export function OverviewPage(): JSX.Element {
   const overview = useGetOverviewKpisQuery();
   const donut = useGetStatusDonutQuery();
   const scheme = useGetSchemeChartQuery();
+  const visibility = useOverviewVisibility();
+  const v = visibility.isVisible;
 
   const refetchAll = (): void => {
     void overview.refetch();
@@ -29,6 +33,22 @@ export function OverviewPage(): JSX.Element {
   };
 
   const anyFetching = overview.isFetching || donut.isFetching || scheme.isFetching;
+
+  const showSchemeChart = v('panel.schemeChart');
+  const showStatusDonut = v('panel.statusDonut');
+  const showChartsRow = showSchemeChart || showStatusDonut;
+
+  const showScheduleVsActual = v('panel.scheduleVsActual');
+  const showFinancialSecurities = v('panel.financialSecurities');
+  const showScheduleFinRow = showScheduleVsActual || showFinancialSecurities;
+
+  const showSector = v('panel.sectorSummary');
+  const showDivision = v('panel.divisionSummary');
+  const showSectorDivisionRow = showSector || showDivision;
+
+  const showPbgAlerts = v('panel.pbgAlerts');
+  const showOmAlerts = v('panel.omAlerts');
+  const showAlertsRow = showPbgAlerts || showOmAlerts;
 
   return (
     <div className="space-y-5">
@@ -43,12 +63,15 @@ export function OverviewPage(): JSX.Element {
             Portfolio-wide view of every project managed by BUIDCO.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={refetchAll} disabled={anyFetching}>
-          <span className={anyFetching ? 'animate-spin' : ''} aria-hidden>
-            ↻
-          </span>{' '}
-          {anyFetching ? 'Refreshing…' : 'Refresh'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <CustomizePopover visibility={visibility} />
+          <Button variant="outline" size="sm" onClick={refetchAll} disabled={anyFetching}>
+            <span className={anyFetching ? 'animate-spin' : ''} aria-hidden>
+              ↻
+            </span>{' '}
+            {anyFetching ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {overview.isLoading ? (
@@ -60,66 +83,75 @@ export function OverviewPage(): JSX.Element {
       ) : overview.error ? (
         <ErrorPanel />
       ) : (
-        <KpiGrid data={overview.data} />
+        <KpiGrid data={overview.data} visibility={visibility} />
       )}
 
-      <StageBucketsCard />
+      {v('panel.stageBuckets') ? <StageBucketsCard /> : null}
 
-      {/* Work Type Mix section removed per user request. Row collapses from
-          3 cols to 2 so ScheduleVsActual + FinancialSecurities each take
-          half-width on lg+. On mobile they stack (default single column). */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ScheduleVsActualCard />
-        <FinancialSecuritiesCard />
-      </div>
+      {showScheduleFinRow ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {showScheduleVsActual ? <ScheduleVsActualCard /> : null}
+          {showFinancialSecurities ? <FinancialSecuritiesCard /> : null}
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Physical vs Financial % by Scheme</CardTitle>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
-              Click a bar to filter
-            </span>
-          </CardHeader>
-          <CardContent>
-            {scheme.isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : scheme.error ? (
-              <p className="text-sm text-[#B91C1C]">Could not load scheme chart.</p>
-            ) : (
-              <SchemeBarChart data={scheme.data?.items ?? []} />
-            )}
-          </CardContent>
-        </Card>
+      {showChartsRow ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {showSchemeChart ? (
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Physical vs Financial % by Scheme</CardTitle>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
+                  Click a bar to filter
+                </span>
+              </CardHeader>
+              <CardContent>
+                {scheme.isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : scheme.error ? (
+                  <p className="text-sm text-[#B91C1C]">Could not load scheme chart.</p>
+                ) : (
+                  <SchemeBarChart data={scheme.data?.items ?? []} />
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Status Breakdown</CardTitle>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
-              Click a slice to filter
-            </span>
-          </CardHeader>
-          <CardContent>
-            {donut.isLoading ? (
-              <Skeleton className="h-[260px] w-full" />
-            ) : donut.error ? (
-              <p className="text-sm text-[#B91C1C]">Could not load status data.</p>
-            ) : (
-              <StatusDonut data={donut.data?.items ?? []} />
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          {showStatusDonut ? (
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Status Breakdown</CardTitle>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
+                  Click a slice to filter
+                </span>
+              </CardHeader>
+              <CardContent>
+                {donut.isLoading ? (
+                  <Skeleton className="h-[260px] w-full" />
+                ) : donut.error ? (
+                  <p className="text-sm text-[#B91C1C]">Could not load status data.</p>
+                ) : (
+                  <StatusDonut data={donut.data?.items ?? []} />
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SectorSummaryCard />
-        <DivisionSummaryCard />
-      </div>
+      {showSectorDivisionRow ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {showSector ? <SectorSummaryCard /> : null}
+          {showDivision ? <DivisionSummaryCard /> : null}
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <PbgAlertsCard />
-        <OmAlertsCard />
-      </div>
+      {showAlertsRow ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {showPbgAlerts ? <PbgAlertsCard /> : null}
+          {showOmAlerts ? <OmAlertsCard /> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
