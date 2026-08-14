@@ -110,6 +110,15 @@ export function SectorsPage(): JSX.Element {
         />
       </div>
 
+      {/* Top-row drill renders here — directly below the aggregate cards. */}
+      {drill && drill.sectorId === null ? (
+        <DrillTable
+          status={METRIC_TO_STATUS[drill.metric]}
+          labelOfContext={`All Sectors · ${METRIC_LABEL[drill.metric]}`}
+          onClose={() => setDrill(null)}
+        />
+      ) : null}
+
       {summary.isLoading ? (
         <Skeleton className="h-40 w-full" />
       ) : (summary.data?.items ?? []).length === 0 ? (
@@ -141,15 +150,12 @@ export function SectorsPage(): JSX.Element {
         </div>
       )}
 
-      {drill ? (
+      {/* Per-entity drill renders here — directly below the per-sector grid. */}
+      {drill && selectedSector ? (
         <DrillTable
-          {...(selectedSector ? { sectorId: selectedSector.sectorId } : {})}
+          sectorId={selectedSector.sectorId}
           status={METRIC_TO_STATUS[drill.metric]}
-          labelOfContext={
-            selectedSector
-              ? `${selectedSector.sectorName} · ${METRIC_LABEL[drill.metric]}`
-              : `All Sectors · ${METRIC_LABEL[drill.metric]}`
-          }
+          labelOfContext={`${selectedSector.sectorName} · ${METRIC_LABEL[drill.metric]}`}
           onClose={() => setDrill(null)}
         />
       ) : null}

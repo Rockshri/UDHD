@@ -131,6 +131,15 @@ export function SchemesPage(): JSX.Element {
         />
       </div>
 
+      {/* Top-row drill renders here — directly below the aggregate cards. */}
+      {drill && drill.schemeId === null ? (
+        <DrillTable
+          status={METRIC_TO_STATUS[drill.metric]}
+          labelOfContext={`All Schemes · ${METRIC_LABEL[drill.metric]}`}
+          onClose={() => setDrill(null)}
+        />
+      ) : null}
+
       {summary.isLoading ? (
         <Skeleton className="h-40 w-full" />
       ) : (summary.data?.items ?? []).length === 0 ? (
@@ -176,15 +185,12 @@ export function SchemesPage(): JSX.Element {
         </div>
       )}
 
-      {drill ? (
+      {/* Per-entity drill renders here — directly below the per-scheme grid. */}
+      {drill && selectedScheme ? (
         <DrillTable
-          {...(selectedScheme ? { schemeId: selectedScheme.schemeId } : {})}
+          schemeId={selectedScheme.schemeId}
           status={METRIC_TO_STATUS[drill.metric]}
-          labelOfContext={
-            selectedScheme
-              ? `${selectedScheme.schemeName} · ${METRIC_LABEL[drill.metric]}`
-              : `All Schemes · ${METRIC_LABEL[drill.metric]}`
-          }
+          labelOfContext={`${selectedScheme.schemeName} · ${METRIC_LABEL[drill.metric]}`}
           onClose={() => setDrill(null)}
         />
       ) : null}

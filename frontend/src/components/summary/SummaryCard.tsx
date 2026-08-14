@@ -299,7 +299,28 @@ export function SummaryCard({
   );
 
   if (perMetric) {
-    return <div className={commonWrap}>{inner}</div>;
+    // Whole card is a click target for the default 'total' drill. Pip
+    // buttons + name/number buttons inside stopPropagation so per-status
+    // clicks don't also fire the whole-card handler.
+    const openTotal = (): void => onMetricClick!('total');
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={openTotal}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openTotal();
+          }
+        }}
+        aria-pressed={activeMetric === 'total'}
+        title="View all projects"
+        className={cn(commonWrap, 'cursor-pointer')}
+      >
+        {inner}
+      </div>
+    );
   }
   return (
     <button
