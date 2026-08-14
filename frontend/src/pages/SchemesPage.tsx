@@ -1,11 +1,25 @@
 import { useMemo, useState } from 'react';
 import { useGetSchemeSummaryQuery, useGetSchemeChartQuery } from '../app/api/kpisApi';
 import { DrillTable } from '../components/summary/DrillTable';
-import { SummaryCard } from '../components/summary/SummaryCard';
+import { SummaryCard, type SummaryCardMetric } from '../components/summary/SummaryCard';
 import { Card, CardContent } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 import { formatPercent } from '../lib/formatters';
+
+const METRIC_TO_STATUS: Record<SummaryCardMetric, string | undefined> = {
+  total: undefined,
+  completed: 'Completed',
+  inProgress: 'In Progress',
+  delayed: 'Delayed',
+};
+
+const METRIC_LABEL: Record<SummaryCardMetric, string> = {
+  total: 'All Projects',
+  completed: 'Completed',
+  inProgress: 'In Progress',
+  delayed: 'Delayed',
+};
 
 const CARD_COLORS = [
   '#1E3A5F',
@@ -21,7 +35,7 @@ const CARD_COLORS = [
 export function SchemesPage(): JSX.Element {
   const summary = useGetSchemeSummaryQuery();
   const chart = useGetSchemeChartQuery();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [drill, setDrill] = useState<{ schemeId: number; metric: SummaryCardMetric } | null>(null);
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -55,8 +69,8 @@ export function SchemesPage(): JSX.Element {
     return map;
   }, [chart.data]);
 
-  const selected = selectedId
-    ? summary.data?.items.find((r) => r.schemeId === selectedId) ?? null
+  const selected = drill
+    ? summary.data?.items.find((r) => r.schemeId === drill.schemeId) ?? null
     : null;
 
   return (
@@ -110,21 +124,27 @@ export function SchemesPage(): JSX.Element {
                       }
                     : undefined
                 }
-                active={selectedId === row.schemeId}
-                onClick={() =>
-                  setSelectedId(selectedId === row.schemeId ? null : row.schemeId)
-                }
+                active={false}
+                activeMetric={drill?.schemeId === row.schemeId ? drill.metric : null}
+                onMetricClick={(metric) => {
+                  setDrill((prev) =>
+                    prev && prev.schemeId === row.schemeId && prev.metric === metric
+                      ? null
+                      : { schemeId: row.schemeId, metric },
+                  );
+                }}
               />
             );
           })}
         </div>
       )}
 
-      {selected ? (
+      {selected && drill ? (
         <DrillTable
           schemeId={selected.schemeId}
-          labelOfContext={selected.schemeName}
-          onClose={() => setSelectedId(null)}
+          status={METRIC_TO_STATUS[drill.metric]}
+          labelOfContext={`${selected.schemeName} · ${METRIC_LABEL[drill.metric]}`}
+          onClose={() => setDrill(null)}
         />
       ) : null}
     </article>

@@ -1,10 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useGetSectorSummaryQuery } from '../app/api/kpisApi';
 import { DrillTable } from '../components/summary/DrillTable';
-import { SummaryCard } from '../components/summary/SummaryCard';
+import { SummaryCard, type SummaryCardMetric } from '../components/summary/SummaryCard';
 import { Card, CardContent } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
+
+const METRIC_TO_STATUS: Record<SummaryCardMetric, string | undefined> = {
+  total: undefined,
+  completed: 'Completed',
+  inProgress: 'In Progress',
+  delayed: 'Delayed',
+};
+
+const METRIC_LABEL: Record<SummaryCardMetric, string> = {
+  total: 'All Projects',
+  completed: 'Completed',
+  inProgress: 'In Progress',
+  delayed: 'Delayed',
+};
 
 const CARD_COLORS = [
   '#1E3A5F',
@@ -16,7 +30,7 @@ const CARD_COLORS = [
 
 export function SectorsPage(): JSX.Element {
   const summary = useGetSectorSummaryQuery();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [drill, setDrill] = useState<{ sectorId: number; metric: SummaryCardMetric } | null>(null);
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -29,8 +43,8 @@ export function SectorsPage(): JSX.Element {
     };
   }, [summary.data]);
 
-  const selected = selectedId
-    ? summary.data?.items.find((r) => r.sectorId === selectedId) ?? null
+  const selected = drill
+    ? summary.data?.items.find((r) => r.sectorId === drill.sectorId) ?? null
     : null;
 
   return (
@@ -69,20 +83,26 @@ export function SectorsPage(): JSX.Element {
               completed={row.completed}
               inProgress={row.inProgress}
               delayed={row.delayed}
-              active={selectedId === row.sectorId}
-              onClick={() =>
-                setSelectedId(selectedId === row.sectorId ? null : row.sectorId)
-              }
+              active={false}
+              activeMetric={drill?.sectorId === row.sectorId ? drill.metric : null}
+              onMetricClick={(metric) => {
+                setDrill((prev) =>
+                  prev && prev.sectorId === row.sectorId && prev.metric === metric
+                    ? null
+                    : { sectorId: row.sectorId, metric },
+                );
+              }}
             />
           ))}
         </div>
       )}
 
-      {selected ? (
+      {selected && drill ? (
         <DrillTable
           sectorId={selected.sectorId}
-          labelOfContext={selected.sectorName}
-          onClose={() => setSelectedId(null)}
+          status={METRIC_TO_STATUS[drill.metric]}
+          labelOfContext={`${selected.sectorName} · ${METRIC_LABEL[drill.metric]}`}
+          onClose={() => setDrill(null)}
         />
       ) : null}
     </article>

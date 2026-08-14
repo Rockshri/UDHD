@@ -12,6 +12,8 @@ interface Props {
   schemeId?: number;
   sectorId?: number;
   districtId?: number;
+  /** Optional status filter — 'Completed', 'In Progress', 'Delayed', etc. */
+  status?: string | undefined;
   labelOfContext: string;
   onClose: () => void;
 }
@@ -20,6 +22,7 @@ export function DrillTable({
   schemeId,
   sectorId,
   districtId,
+  status,
   labelOfContext,
   onClose,
 }: Props): JSX.Element {
@@ -28,6 +31,7 @@ export function DrillTable({
     ...(schemeId ? { schemeId } : {}),
     ...(sectorId ? { sectorId } : {}),
     ...(districtId ? { districtId } : {}),
+    ...(status ? { status } : {}),
   };
   const { data, isLoading } = useListProjectsQuery(args);
   const items = data?.items ?? [];

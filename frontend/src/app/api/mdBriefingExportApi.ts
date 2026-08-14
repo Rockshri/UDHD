@@ -73,7 +73,7 @@ export async function downloadMdBriefing({ format, filters, accessToken }: Downl
 
 // ─── Project snapshot (single project, drilled-in view) ──────────────────
 
-export type ProjectSnapshotFormat = 'xlsx' | 'pdf';
+export type ProjectSnapshotFormat = 'xlsx' | 'pdf' | 'pptx';
 
 interface SnapshotOpts {
   projectId: string;

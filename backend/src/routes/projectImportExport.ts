@@ -12,7 +12,7 @@ import {
 } from '../services/projectExportService.js';
 import { importProjects, type ImportMode } from '../services/projectImportService.js';
 import {
-  exportProjectSnapshotToPdf, exportProjectSnapshotToXlsx,
+  exportProjectSnapshotToPdf, exportProjectSnapshotToPptx, exportProjectSnapshotToXlsx,
   snapshotFilenameStem,
 } from '../services/projectSnapshotService.js';
 
@@ -149,9 +149,9 @@ projectImportExportRouter.get('/export', async (req, res, next) => {
   }
 });
 
-// ─── GET /projects/:projectId/snapshot?format=xlsx|pdf — MD-only single-project ──
+// ─── GET /projects/:projectId/snapshot?format=xlsx|pdf|pptx — MD-only single-project ──
 const snapshotQuerySchema = z.object({
-  format: z.enum(['xlsx', 'pdf']),
+  format: z.enum(['xlsx', 'pdf', 'pptx']),
 });
 const snapshotParamSchema = z.object({
   projectId: z.string().min(1).max(60),
@@ -176,6 +176,10 @@ projectImportExportRouter.get(
         out = await exportProjectSnapshotToXlsx(projectId, actor, pdDivisionId);
         mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         ext = 'xlsx';
+      } else if (format === 'pptx') {
+        out = await exportProjectSnapshotToPptx(projectId, actor, pdDivisionId);
+        mime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+        ext = 'pptx';
       } else {
         out = await exportProjectSnapshotToPdf(projectId, actor, pdDivisionId);
         mime = 'application/pdf';

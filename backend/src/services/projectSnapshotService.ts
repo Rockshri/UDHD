@@ -13,7 +13,14 @@
 
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
+import PptxGenJSDefault from 'pptxgenjs';
 import { eq } from 'drizzle-orm';
+
+// pptxgenjs default export is the constructor at runtime, but the shipped
+// .d.ts describes it as a namespace. Alias to a plain constructor signature
+// so TypeScript accepts `new`. Same workaround the MD briefing service uses.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const PptxGenJS = PptxGenJSDefault as unknown as new () => any;
 import { db } from '../db/client.js';
 import {
   cosEotItem, division, geoPhoto, managementActionItem, project, projectScheme,
@@ -311,6 +318,161 @@ function fmtDateCell(v: unknown): string {
   const s = String(v);
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? s : fmtDate(d);
+}
+
+// ─── PowerPoint (single-project slide deck) ──────────────────────────────
+
+export async function exportProjectSnapshotToPptx(
+  projectId: string, _actor: AuditActor, pdDivisionId: number | null,
+): Promise<{ buffer: Buffer; ctx: SnapshotContext }> {
+  void _actor;
+  const data = await loadSnapshot(projectId, pdDivisionId);
+  const p = data.project;
+  const ctx: SnapshotContext = {
+    projectId,
+    projectName: String(p.projectName ?? projectId),
+    generatedAt: new Date(),
+  };
+
+  const pptx = new PptxGenJS();
+  pptx.author = 'BUIDCO Dashboard';
+  pptx.title = `Project Snapshot — ${ctx.projectName}`;
+  pptx.layout = 'LAYOUT_WIDE'; // 13.3 x 7.5 inches
+
+  // Cover slide — matches the PDF's dark title band.
+  const cover = pptx.addSlide();
+  cover.background = { color: '1E3A5F' };
+  cover.addText('MD PORTFOLIO BRIEFING · PROJECT SNAPSHOT', {
+    x: 0.5, y: 2.4, w: 12.3, h: 0.5,
+    fontSize: 14, bold: true, color: '93C5FD', align: 'center', fontFace: 'Arial',
+  });
+  cover.addText(ctx.projectName, {
+    x: 0.5, y: 3.0, w: 12.3, h: 1.2,
+    fontSize: 32, bold: true, color: 'FFFFFF', align: 'center', fontFace: 'Arial',
+  });
+  cover.addText(`Project ID: ${ctx.projectId}`, {
+    x: 0.5, y: 4.4, w: 12.3, h: 0.4,
+    fontSize: 14, color: 'BFDBFE', align: 'center', italic: true, fontFace: 'Arial',
+  });
+  cover.addText(`Generated ${fmtDate(ctx.generatedAt)}`, {
+    x: 0.5, y: 6.8, w: 12.3, h: 0.4,
+    fontSize: 12, color: '93C5FD', align: 'center', fontFace: 'Arial',
+  });
+
+  // Section slides — one per PDF section for parity.
+  addSection(pptx, 'Basic Info', [
+    ['Sector',              data.sectorName ?? '—'],
+    ['Region',              data.regionName ?? '—'],
+    ['Division',            data.divisionName ?? '—'],
+    ['City',                str(p.city)],
+    ['Contractor',          str(p.contractor)],
+    ['PD',                  str(p.pd)],
+    ['Contract Type',       str(p.contractType)],
+    ['Sponsoring Dept.',    str(p.sponsoringDept)],
+    ['Implementing Agency', str(p.implementingAgency)],
+    ['Sanction Date',       fmtDateCell(p.sanctionDate)],
+    ['Schemes',             data.schemes.length > 0 ? data.schemes.join(', ') : '—'],
+  ]);
+
+  addSection(pptx, 'Phase, Status & Dates', [
+    ['Project Stage',   str(p.projectStageV2)],
+    ['Status',          str(p.status)],
+    ['Planned End',     fmtDateCell(p.plannedEndDate)],
+    ['Revised End',     fmtDateCell(p.revisedEndDate)],
+    ['Delay Reason',    str(p.delayReason)],
+    ['Stuck At',        str(p.deptStuckAt)],
+  ]);
+
+  addSection(pptx, 'Progress & Financial', [
+    ['AA Amount (₹ Cr)',      money(p.aaAmountCr)],
+    ['Revised AA (₹ Cr)',     money(p.revisedAaAmountCr)],
+    ['Agreement Amt (₹ Cr)',  money(p.agreementAmountCr)],
+    ['Fin. Progress (₹ Cr)',  money(p.financialProgressCr)],
+    ['Physical %',            pct(p.physicalProgressPct)],
+    ['Scheduled %',           pct(p.scheduledProgressPct)],
+    ['Financial %',           pct(p.financialProgressPct)],
+    ['Priority',              str(p.priority)],
+  ]);
+
+  addSection(pptx, 'Contract & Financial Security', [
+    ['Agreement Number',      str(p.agreementNumber)],
+    ['Agreement Date',        fmtDateCell(p.agreementDate)],
+    ['Appointed Date',        fmtDateCell(p.appointedDate)],
+    ['Contract Value (₹ Cr)', money(p.contractValueCr)],
+    ['PBG Number',            str(p.pbgNumber)],
+    ['PBG Amount (₹ Cr)',     money(p.pbgAmountCr)],
+    ['PBG Expiry',            fmtDateCell(p.pbgExpiryDate)],
+    ['EMD (₹ Cr)',            money(p.emdAmountCr)],
+    ['Total Payments (₹ Cr)', money(p.totalPaymentsCr)],
+    ['Last Payment',          fmtDateCell(p.lastPaymentDate)],
+  ]);
+
+  if (p.omApplicable === true || p.omStartDate || p.omPeriodMonths) {
+    addSection(pptx, 'O&M', [
+      ['O&M Applicable',   p.omApplicable === true ? 'Yes' : p.omApplicable === false ? 'No' : '—'],
+      ['O&M Start',        fmtDateCell(p.omStartDate)],
+      ['O&M Period (mo.)', str(p.omPeriodMonths)],
+      ['O&M End',          fmtDateCell(p.omEndDate)],
+      ['O&M Agency',       str(p.omAgency)],
+      ['O&M Status',       str(p.omStatusOverride)],
+    ]);
+  }
+
+  if (data.cosItems.length > 0 || data.mgmtItems.length > 0 || data.geoPhotos.length > 0 || p.geoTaggingUrl) {
+    addSection(pptx, 'Related Data', [
+      ['CoS/EoT entries',    String(data.cosItems.length)],
+      ['Management actions', String(data.mgmtItems.length)],
+      ['Geo photos',         String(data.geoPhotos.length)],
+      ['GeoTag URL',         str(p.geoTaggingUrl)],
+    ]);
+  }
+
+  const blob = await pptx.write({ outputType: 'nodebuffer' });
+  return { buffer: blob as Buffer, ctx };
+}
+
+/**
+ * Renders one section as its own slide: navy header band + two-column
+ * label/value grid. Mirrors the PDF's `drawSection` visual language so the
+ * two exports look like siblings.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function addSection(pptx: any, title: string, rows: Array<[string, string]>): void {
+  const slide = pptx.addSlide();
+  // Header band
+  slide.addShape('rect', {
+    x: 0, y: 0, w: 13.3, h: 0.7,
+    fill: { color: '1E3A5F' }, line: { color: '1E3A5F', width: 0 },
+  });
+  slide.addText(title, {
+    x: 0.5, y: 0.12, w: 12.3, h: 0.5,
+    fontSize: 22, bold: true, color: 'FFFFFF', fontFace: 'Arial',
+  });
+
+  const startY = 1.1;
+  const rowH = 0.5;
+  const labelW = 4.3;
+  const valueW = 8.5;
+  const leftX = 0.25;
+  rows.forEach(([label, value], i) => {
+    const y = startY + i * rowH;
+    slide.addShape('rect', {
+      x: leftX, y, w: labelW, h: rowH - 0.05,
+      fill: { color: 'F3F4F6' }, line: { color: 'E5E7EB', width: 0.5 },
+    });
+    slide.addShape('rect', {
+      x: leftX + labelW, y, w: valueW, h: rowH - 0.05,
+      fill: { color: 'FFFFFF' }, line: { color: 'E5E7EB', width: 0.5 },
+    });
+    slide.addText(label, {
+      x: leftX + 0.15, y: y + 0.08, w: labelW - 0.3, h: rowH - 0.2,
+      fontSize: 12, bold: true, color: '374151', fontFace: 'Arial',
+    });
+    slide.addText(value || '—', {
+      x: leftX + labelW + 0.15, y: y + 0.08, w: valueW - 0.3, h: rowH - 0.2,
+      fontSize: 12, color: '111827', fontFace: 'Arial',
+    });
+  });
 }
 
 /** Filename stem for both formats. */

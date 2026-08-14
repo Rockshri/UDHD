@@ -2,9 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
 import { useGetDelayStatusQuery } from '../../app/api/kpisApi';
 import {
-  downloadMdBriefing,
   downloadProjectSnapshot,
-  type MdBriefingFormat,
   type ProjectSnapshotFormat,
 } from '../../app/api/mdBriefingExportApi';
 import { useGetProjectQuery, useListProjectsQuery } from '../../app/api/projectsApi';
@@ -297,47 +295,24 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
   const [filterDivisionId, setFilterDivisionId] = useState<number | null>(null);
   const [filterStatus,     setFilterStatus]     = useState<string | null>(null);
 
-  // Export state — dropdown open/closed + in-flight/error surfaced in the
-  // header. Filters above define the "currently-viewed slice" that gets
-  // packaged into the exported briefing document.
+  // Snapshot download state — the whole-briefing Export near the ✕ was
+  // removed per spec §6. Only the single-project Snapshot Download remains.
   const accessToken = useAppSelector(selectAccessToken);
-  const [exportOpen,  setExportOpen]  = useState(false);
-  const [exportBusy,  setExportBusy]  = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const exportMenuRef = useRef<HTMLDivElement>(null);
-
-  const runExport = async (format: MdBriefingFormat): Promise<void> => {
-    setExportOpen(false);
-    setExportError(null);
-    setExportBusy(true);
-    try {
-      await downloadMdBriefing({
-        format,
-        accessToken,
-        filters: {
-          schemeId:   filterSchemeId,
-          sectorId:   filterSectorId,
-          regionId:   filterRegionId,
-          divisionId: filterDivisionId,
-          status:     filterStatus,
-        },
-      });
-    } catch (e) {
-      setExportError(e instanceof Error ? e.message : 'Export failed.');
-    } finally {
-      setExportBusy(false);
-    }
-  };
+  const [downloadOpen,  setDownloadOpen]  = useState(false);
+  const [exportBusy,    setExportBusy]    = useState(false);
+  const [exportError,   setExportError]   = useState<string | null>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   /**
-   * Single-project snapshot download (Task 4 — MD-only backend route).
-   * Shares busy/error state with the portfolio export so the header
-   * "Exporting…" pill covers both flows.
+   * Single-project snapshot download (Excel / PDF / PPT). Backend route is
+   * MD-only. Closes the dropdown before the fetch so a slow network doesn't
+   * leave the menu hanging open.
    */
   const runSnapshot = async (format: ProjectSnapshotFormat): Promise<void> => {
     if (!activeProjectId) return;
+    setDownloadOpen(false);
     setExportError(null);
     setExportBusy(true);
     try {
@@ -400,26 +375,26 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
     if (!open) return;
     const handler = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return;
-      if (exportOpen)      { setExportOpen(false);   return; }
+      if (downloadOpen)    { setDownloadOpen(false);   return; }
       if (openPicker)      { setOpenPicker(null);     return; }
       if (activeProjectId) { setActiveProjectId(null); return; }
       onClose();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open, exportOpen, openPicker, activeProjectId, onClose]);
+  }, [open, downloadOpen, openPicker, activeProjectId, onClose]);
 
-  // ── Outside-click closes the export dropdown ──
+  // ── Outside-click closes the snapshot Download dropdown ──
   useEffect(() => {
-    if (!exportOpen) return;
+    if (!downloadOpen) return;
     const handler = (e: MouseEvent): void => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setExportOpen(false);
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setDownloadOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [exportOpen]);
+  }, [downloadOpen]);
 
   // Any filter change clears the drilled-in project (it may have just been
   // filtered out of view).
@@ -693,48 +668,8 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
             <h2 className="mt-0.5 text-[15px] font-bold text-white">Scheme Summary</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {/* Export dropdown — exports the currently-viewed slice
-                (whatever filters are active on the row below). */}
-            <div ref={exportMenuRef} className="relative">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setExportOpen((v) => !v)}
-                disabled={exportBusy}
-                aria-haspopup="menu"
-                aria-expanded={exportOpen}
-                title="Export the current view (Excel / PDF / PowerPoint)"
-                className="border-white/40 bg-white/15 text-white hover:bg-white/25"
-              >
-                {exportBusy ? 'Exporting…' : '📤 Export ▾'}
-              </Button>
-              {exportOpen ? (
-                <div
-                  role="menu"
-                  aria-label="Export format"
-                  className="absolute right-0 top-full z-50 mt-1.5 w-[210px] overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-xl"
-                >
-                  <ExportMenuItem
-                    icon="📊"
-                    label="Excel (.xlsx)"
-                    hint="Summary + full project list"
-                    onClick={() => void runExport('xlsx')}
-                  />
-                  <ExportMenuItem
-                    icon="📄"
-                    label="PDF (.pdf)"
-                    hint="Landscape summary + table"
-                    onClick={() => void runExport('pdf')}
-                  />
-                  <ExportMenuItem
-                    icon="📽"
-                    label="PowerPoint (.pptx)"
-                    hint="Cover · KPIs · Breakdown · Projects"
-                    onClick={() => void runExport('pptx')}
-                  />
-                </div>
-              ) : null}
-            </div>
+            {/* Header Export removed per spec §6 — Project Snapshot Download
+                (in the left panel) is now the only export surface here. */}
             <Button
               size="sm"
               variant="outline"
@@ -791,28 +726,47 @@ export function MdSchemeSummaryModal({ open, onClose }: Props): JSX.Element | nu
                     >
                       ← Back to KPIs
                     </button>
-                    {/* Snapshot export buttons — one per format for
-                        discoverability (only 2 formats, dropdown would be
-                        heavier than 2 direct buttons). Shared exportBusy
-                        state disables both while a download is in-flight. */}
-                    <button
-                      type="button"
-                      onClick={() => void runSnapshot('pdf')}
-                      disabled={exportBusy}
-                      title="Download this project's snapshot as PDF"
-                      className="rounded-md border border-[#1E3A5F] bg-white px-2 py-1 text-[10.5px] font-semibold text-[#1E3A5F] hover:bg-[#F0F4F8] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      📄 PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void runSnapshot('xlsx')}
-                      disabled={exportBusy}
-                      title="Download this project's snapshot as Excel (import-template shape)"
-                      className="rounded-md border border-[#059669] bg-white px-2 py-1 text-[10.5px] font-semibold text-[#059669] hover:bg-[#ECFDF5] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      📊 Excel
-                    </button>
+                    {/* Unified Snapshot Download dropdown (spec §5) —
+                        Excel / PDF / PPT in one control. */}
+                    <div ref={downloadMenuRef} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setDownloadOpen((v) => !v)}
+                        disabled={exportBusy}
+                        aria-haspopup="menu"
+                        aria-expanded={downloadOpen}
+                        title="Download this project's snapshot"
+                        className="rounded-md border border-[#1E3A5F] bg-[#1E3A5F] px-2 py-1 text-[10.5px] font-semibold text-white hover:bg-[#162B47] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {exportBusy ? 'Downloading…' : '⬇ Download ▾'}
+                      </button>
+                      {downloadOpen ? (
+                        <div
+                          role="menu"
+                          aria-label="Snapshot format"
+                          className="absolute right-0 top-full z-50 mt-1.5 w-[210px] overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-xl"
+                        >
+                          <ExportMenuItem
+                            icon="📊"
+                            label="Excel (.xlsx)"
+                            hint="Single-row import-template shape"
+                            onClick={() => void runSnapshot('xlsx')}
+                          />
+                          <ExportMenuItem
+                            icon="📄"
+                            label="PDF (.pdf)"
+                            hint="One-page portrait record"
+                            onClick={() => void runSnapshot('pdf')}
+                          />
+                          <ExportMenuItem
+                            icon="📽"
+                            label="PowerPoint (.pptx)"
+                            hint="One slide per section"
+                            onClick={() => void runSnapshot('pptx')}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setOpenPicker(openPicker === 'proj' ? null : 'proj')}
