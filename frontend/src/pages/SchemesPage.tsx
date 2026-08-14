@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useGetSchemeSummaryQuery, useGetSchemeChartQuery } from '../app/api/kpisApi';
 import { DrillTable } from '../components/summary/DrillTable';
+import { MetricButton } from '../components/summary/MetricButton';
 import { SummaryCard, type SummaryCardMetric } from '../components/summary/SummaryCard';
 import { Card, CardContent } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
@@ -32,10 +33,16 @@ const CARD_COLORS = [
   '#7C3AED',
 ];
 
+/**
+ * Mirrors the SectorsPage drill state — either a top-row drill
+ * (schemeId: null) or a per-scheme drill. Only one visible at a time.
+ */
+type DrillState = { schemeId: number | null; metric: SummaryCardMetric };
+
 export function SchemesPage(): JSX.Element {
   const summary = useGetSchemeSummaryQuery();
   const chart = useGetSchemeChartQuery();
-  const [drill, setDrill] = useState<{ schemeId: number; metric: SummaryCardMetric } | null>(null);
+  const [drill, setDrill] = useState<DrillState | null>(null);
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -69,25 +76,59 @@ export function SchemesPage(): JSX.Element {
     return map;
   }, [chart.data]);
 
-  const selected = drill
+  const selectedScheme = drill?.schemeId != null
     ? summary.data?.items.find((r) => r.schemeId === drill.schemeId) ?? null
     : null;
+
+  const toggleDrill = (next: DrillState): void => {
+    setDrill((prev) =>
+      prev && prev.schemeId === next.schemeId && prev.metric === next.metric
+        ? null
+        : next,
+    );
+  };
+
+  const topActiveMetric = drill && drill.schemeId === null ? drill.metric : null;
 
   return (
     <article className="space-y-4">
       <header>
         <h1 className="text-lg font-bold text-[#111827]">Scheme-wise Summary</h1>
         <p className="text-[12.5px] text-[#6B7280]">
-          Click a scheme card to drill into its projects.
+          Click any card to drill into projects — either portfolio-wide or scoped to a scheme.
         </p>
       </header>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        <Metric label="Schemes" value={totals.schemes} tone="brand" />
-        <Metric label="Projects" value={totals.projects} tone="brand" />
-        <Metric label="Completed" value={totals.completed} tone="success" />
-        <Metric label="In Progress" value={totals.inProgress} tone="info" />
-        <Metric label="Delayed" value={totals.delayed} tone="danger" />
+        <SchemesCountCard value={totals.schemes} />
+        <MetricButton
+          label="Projects"
+          value={totals.projects}
+          tone="brand"
+          active={topActiveMetric === 'total'}
+          onClick={() => toggleDrill({ schemeId: null, metric: 'total' })}
+        />
+        <MetricButton
+          label="Completed"
+          value={totals.completed}
+          tone="success"
+          active={topActiveMetric === 'completed'}
+          onClick={() => toggleDrill({ schemeId: null, metric: 'completed' })}
+        />
+        <MetricButton
+          label="In Progress"
+          value={totals.inProgress}
+          tone="info"
+          active={topActiveMetric === 'inProgress'}
+          onClick={() => toggleDrill({ schemeId: null, metric: 'inProgress' })}
+        />
+        <MetricButton
+          label="Delayed"
+          value={totals.delayed}
+          tone="danger"
+          active={topActiveMetric === 'delayed'}
+          onClick={() => toggleDrill({ schemeId: null, metric: 'delayed' })}
+        />
       </div>
 
       {summary.isLoading ? (
@@ -126,24 +167,24 @@ export function SchemesPage(): JSX.Element {
                 }
                 active={false}
                 activeMetric={drill?.schemeId === row.schemeId ? drill.metric : null}
-                onMetricClick={(metric) => {
-                  setDrill((prev) =>
-                    prev && prev.schemeId === row.schemeId && prev.metric === metric
-                      ? null
-                      : { schemeId: row.schemeId, metric },
-                  );
-                }}
+                onMetricClick={(metric) =>
+                  toggleDrill({ schemeId: row.schemeId, metric })
+                }
               />
             );
           })}
         </div>
       )}
 
-      {selected && drill ? (
+      {drill ? (
         <DrillTable
-          schemeId={selected.schemeId}
+          {...(selectedScheme ? { schemeId: selectedScheme.schemeId } : {})}
           status={METRIC_TO_STATUS[drill.metric]}
-          labelOfContext={`${selected.schemeName} · ${METRIC_LABEL[drill.metric]}`}
+          labelOfContext={
+            selectedScheme
+              ? `${selectedScheme.schemeName} · ${METRIC_LABEL[drill.metric]}`
+              : `All Schemes · ${METRIC_LABEL[drill.metric]}`
+          }
           onClose={() => setDrill(null)}
         />
       ) : null}
@@ -151,33 +192,19 @@ export function SchemesPage(): JSX.Element {
   );
 }
 
-function Metric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: 'brand' | 'info' | 'success' | 'danger';
-}): JSX.Element {
-  const palette: Record<typeof tone, { border: string; text: string }> = {
-    brand: { border: 'border-t-[#1E3A5F]', text: 'text-[#1E3A5F]' },
-    info: { border: 'border-t-[#1D4ED8]', text: 'text-[#1D4ED8]' },
-    success: { border: 'border-t-[#15803D]', text: 'text-[#15803D]' },
-    danger: { border: 'border-t-[#B91C1C]', text: 'text-[#B91C1C]' },
-  };
-  const p = palette[tone];
+/** Plain informational card for the schemes count (no project drill). */
+function SchemesCountCard({ value }: { value: number }): JSX.Element {
   return (
     <div
       className={cn(
-        'rounded border-t-4 border-x border-b border-[#E5E7EB] bg-white px-3 py-2 shadow-sm',
-        p.border,
+        'rounded border-t-4 border-x border-b border-[#E5E7EB] border-t-[#1E3A5F] bg-white px-3 py-2 shadow-sm',
       )}
     >
       <div className="text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-        {label}
+        Schemes
       </div>
-      <div className={cn('text-xl font-extrabold tabular-nums', p.text)}>{value}</div>
+      <div className="text-xl font-extrabold tabular-nums text-[#1E3A5F]">{value}</div>
+      <div className="mt-0.5 text-[10.5px] text-[#9CA3AF]">Total categories</div>
     </div>
   );
 }

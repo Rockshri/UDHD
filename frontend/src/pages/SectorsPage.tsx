@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useGetSectorSummaryQuery } from '../app/api/kpisApi';
 import { DrillTable } from '../components/summary/DrillTable';
+import { MetricButton } from '../components/summary/MetricButton';
 import { SummaryCard, type SummaryCardMetric } from '../components/summary/SummaryCard';
 import { Card, CardContent } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
@@ -28,9 +29,18 @@ const CARD_COLORS = [
   '#93C5FD',
 ];
 
+/**
+ * Drill state is a single field that can hold either:
+ *   - { sectorId: null, metric }   → top-row drill (all sectors)
+ *   - { sectorId: X, metric }      → per-sector drill
+ * Only one drill visible at a time; clicking the currently-active source
+ * again closes it.
+ */
+type DrillState = { sectorId: number | null; metric: SummaryCardMetric };
+
 export function SectorsPage(): JSX.Element {
   const summary = useGetSectorSummaryQuery();
-  const [drill, setDrill] = useState<{ sectorId: number; metric: SummaryCardMetric } | null>(null);
+  const [drill, setDrill] = useState<DrillState | null>(null);
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -43,25 +53,61 @@ export function SectorsPage(): JSX.Element {
     };
   }, [summary.data]);
 
-  const selected = drill
+  const selectedSector = drill?.sectorId != null
     ? summary.data?.items.find((r) => r.sectorId === drill.sectorId) ?? null
     : null;
+
+  // Helper: same-source-same-metric toggles off; otherwise switches to new source.
+  const toggleDrill = (next: DrillState): void => {
+    setDrill((prev) =>
+      prev && prev.sectorId === next.sectorId && prev.metric === next.metric
+        ? null
+        : next,
+    );
+  };
+
+  const topActiveMetric = drill && drill.sectorId === null ? drill.metric : null;
 
   return (
     <article className="space-y-4">
       <header>
         <h1 className="text-lg font-bold text-[#111827]">Sector-wise Summary</h1>
         <p className="text-[12.5px] text-[#6B7280]">
-          Click a sector card to drill into its projects.
+          Click any card to drill into projects — either portfolio-wide or scoped to a sector.
         </p>
       </header>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        <Metric label="Sectors" value={totals.sectors} tone="brand" />
-        <Metric label="Projects" value={totals.projects} tone="brand" />
-        <Metric label="Completed" value={totals.completed} tone="success" />
-        <Metric label="In Progress" value={totals.inProgress} tone="info" />
-        <Metric label="Delayed" value={totals.delayed} tone="danger" />
+        {/* Sectors count is a category count, not a project drill → plain label. */}
+        <SectorsCountCard value={totals.sectors} />
+        <MetricButton
+          label="Projects"
+          value={totals.projects}
+          tone="brand"
+          active={topActiveMetric === 'total'}
+          onClick={() => toggleDrill({ sectorId: null, metric: 'total' })}
+        />
+        <MetricButton
+          label="Completed"
+          value={totals.completed}
+          tone="success"
+          active={topActiveMetric === 'completed'}
+          onClick={() => toggleDrill({ sectorId: null, metric: 'completed' })}
+        />
+        <MetricButton
+          label="In Progress"
+          value={totals.inProgress}
+          tone="info"
+          active={topActiveMetric === 'inProgress'}
+          onClick={() => toggleDrill({ sectorId: null, metric: 'inProgress' })}
+        />
+        <MetricButton
+          label="Delayed"
+          value={totals.delayed}
+          tone="danger"
+          active={topActiveMetric === 'delayed'}
+          onClick={() => toggleDrill({ sectorId: null, metric: 'delayed' })}
+        />
       </div>
 
       {summary.isLoading ? (
@@ -84,24 +130,26 @@ export function SectorsPage(): JSX.Element {
               inProgress={row.inProgress}
               delayed={row.delayed}
               active={false}
-              activeMetric={drill?.sectorId === row.sectorId ? drill.metric : null}
-              onMetricClick={(metric) => {
-                setDrill((prev) =>
-                  prev && prev.sectorId === row.sectorId && prev.metric === metric
-                    ? null
-                    : { sectorId: row.sectorId, metric },
-                );
-              }}
+              activeMetric={
+                drill?.sectorId === row.sectorId ? drill.metric : null
+              }
+              onMetricClick={(metric) =>
+                toggleDrill({ sectorId: row.sectorId, metric })
+              }
             />
           ))}
         </div>
       )}
 
-      {selected && drill ? (
+      {drill ? (
         <DrillTable
-          sectorId={selected.sectorId}
+          {...(selectedSector ? { sectorId: selectedSector.sectorId } : {})}
           status={METRIC_TO_STATUS[drill.metric]}
-          labelOfContext={`${selected.sectorName} · ${METRIC_LABEL[drill.metric]}`}
+          labelOfContext={
+            selectedSector
+              ? `${selectedSector.sectorName} · ${METRIC_LABEL[drill.metric]}`
+              : `All Sectors · ${METRIC_LABEL[drill.metric]}`
+          }
           onClose={() => setDrill(null)}
         />
       ) : null}
@@ -109,33 +157,19 @@ export function SectorsPage(): JSX.Element {
   );
 }
 
-function Metric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: 'brand' | 'info' | 'success' | 'danger';
-}): JSX.Element {
-  const palette: Record<typeof tone, { border: string; text: string }> = {
-    brand: { border: 'border-t-[#1E3A5F]', text: 'text-[#1E3A5F]' },
-    info: { border: 'border-t-[#1D4ED8]', text: 'text-[#1D4ED8]' },
-    success: { border: 'border-t-[#15803D]', text: 'text-[#15803D]' },
-    danger: { border: 'border-t-[#B91C1C]', text: 'text-[#B91C1C]' },
-  };
-  const p = palette[tone];
+/** Plain informational card for the sectors count (no project drill). */
+function SectorsCountCard({ value }: { value: number }): JSX.Element {
   return (
     <div
       className={cn(
-        'rounded border-t-4 border-x border-b border-[#E5E7EB] bg-white px-3 py-2 shadow-sm',
-        p.border,
+        'rounded border-t-4 border-x border-b border-[#E5E7EB] border-t-[#1E3A5F] bg-white px-3 py-2 shadow-sm',
       )}
     >
       <div className="text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-        {label}
+        Sectors
       </div>
-      <div className={cn('text-xl font-extrabold tabular-nums', p.text)}>{value}</div>
+      <div className="text-xl font-extrabold tabular-nums text-[#1E3A5F]">{value}</div>
+      <div className="mt-0.5 text-[10.5px] text-[#9CA3AF]">Total categories</div>
     </div>
   );
 }

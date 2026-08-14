@@ -90,14 +90,33 @@ export function SummaryCard({
 
   const inner = (
     <>
-      <div
-        className={cn(
-          'text-[13px] font-bold',
-          anyActive ? 'text-white' : 'text-[#111827]',
-        )}
-      >
-        {name}
-      </div>
+      {/* Card name — also opens the 'all projects' drill in per-metric mode
+          so users have a second click surface besides the big number. */}
+      {perMetric ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMetricClick!('total');
+          }}
+          title="View all projects"
+          className={cn(
+            'text-left text-[13px] font-bold hover:underline underline-offset-2 focus:outline-none focus:underline',
+            anyActive ? 'text-white' : 'text-[#111827]',
+          )}
+        >
+          {name}
+        </button>
+      ) : (
+        <div
+          className={cn(
+            'text-[13px] font-bold',
+            anyActive ? 'text-white' : 'text-[#111827]',
+          )}
+        >
+          {name}
+        </div>
+      )}
       {/* Big count == "Projects" metric per spec §1/§2. Clickable when
           onMetricClick is provided; falls back to legacy plain text. */}
       {perMetric ? (
