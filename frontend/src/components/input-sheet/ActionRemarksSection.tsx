@@ -81,12 +81,26 @@ export function ActionRemarksSection({
   };
 
   return (
-    <Card>
+    // Card gets an amber/red tint whenever the project has an Outstanding
+    // Gap (spec §5-§7). Non-gap state stays neutral white so the section
+    // isn't visually noisy for the common case.
+    <Card
+      className={cn(
+        'transition-colors',
+        hasGap
+          ? 'border-[#F59E0B] bg-[#FFFBEB] shadow-[0_0_0_2px_rgba(245,158,11,0.15)]'
+          : '',
+      )}
+    >
       <CardContent className="pt-4">
         <FormSectionHeader
           num={num}
           title="Action & Remarks"
-          sub="Outstanding gaps, priority, and management action items"
+          sub={
+            hasGap
+              ? '⚠ Outstanding gap flagged — action items required'
+              : 'Outstanding gaps, priority, and management action items'
+          }
         />
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

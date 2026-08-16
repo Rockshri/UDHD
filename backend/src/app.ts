@@ -14,7 +14,6 @@ import { momRouter } from './routes/mom.js';
 import { projectImportExportRouter } from './routes/projectImportExport.js';
 import { preMonsoonRouter } from './routes/preMonsoon.js';
 import { projectsRouter } from './routes/projects.js';
-import { standaloneMgmtActionsRouter } from './routes/standaloneMgmtActions.js';
 import { uploadsRouter } from './routes/uploads.js';
 import { usersRouter } from './routes/users.js';
 
@@ -43,7 +42,6 @@ export function createApp(): Express {
   app.use('/api/projects', projectsRouter);
   app.use('/api/mom', momRouter);
   app.use('/api/pre-monsoon', preMonsoonRouter);
-  app.use('/api/management-actions/standalone', standaloneMgmtActionsRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/audit', auditRouter);
   app.use('/api/uploads', uploadsRouter);

@@ -310,21 +310,6 @@ export const managementActionItem = pgTable(
   }),
 );
 
-export const standaloneManagementAction = pgTable(
-  'standalone_management_action',
-  {
-    actionId: serial('action_id').primaryKey(),
-    topic: text('topic').notNull(),
-    status: varchar('status', { length: 10 }).notNull().default('Open'),
-    deadlineDate: date('deadline_date'),
-    createdBy: integer('created_by'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => ({
-    statusIdx: index('idx_standalone_mgmt_action_status').on(t.status),
-  }),
-);
 
 export const geoPhoto = pgTable('geo_photo', {
   photoId: serial('photo_id').primaryKey(),
@@ -500,9 +485,6 @@ export type CosEotItemInsert = typeof cosEotItem.$inferInsert;
 
 export type ManagementActionItem = typeof managementActionItem.$inferSelect;
 export type ManagementActionItemInsert = typeof managementActionItem.$inferInsert;
-
-export type StandaloneManagementAction = typeof standaloneManagementAction.$inferSelect;
-export type StandaloneManagementActionInsert = typeof standaloneManagementAction.$inferInsert;
 
 export type GeoPhoto = typeof geoPhoto.$inferSelect;
 export type GeoPhotoInsert = typeof geoPhoto.$inferInsert;
