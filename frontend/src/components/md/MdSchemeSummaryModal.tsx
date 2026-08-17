@@ -108,7 +108,10 @@ interface ColDef { key: ColKey; label: string; defaultOn: boolean; locked?: bool
 const COLUMN_DEFS: ColDef[] = [
   { key: 'projectName',         label: 'Project Name',         defaultOn: true, locked: true },
   { key: 'city',                label: 'City',                 defaultOn: false },
-  { key: 'district',            label: 'District',             defaultOn: true  },
+  // 'district' column removed per request — Division is the primary
+  // geographic dimension in the register now. renderCell / column filter
+  // still handle the key defensively in case an older saved column-visibility
+  // preference includes it, but no default UI surfaces it.
   { key: 'division',            label: 'Division',             defaultOn: true  },
   { key: 'region',              label: 'Region',               defaultOn: false },
   { key: 'contractor',          label: 'Contractor',           defaultOn: false },
@@ -1288,29 +1291,33 @@ function ProjectList({
 /** Columns whose values bucket meaningfully — skip pure-visual cells
  *  (progress bars, alerts) and free-text unique columns (project name). */
 const COLUMN_FILTERABLE = new Set<ColKey>([
-  'city', 'district', 'division', 'region', 'contractor', 'pd', 'sector',
+  'city', 'division', 'region', 'contractor', 'pd', 'sector', 'schemes',
   'contractType', 'status', 'priority', 'outstandingGap',
 ]);
 
 /** Bucket a cell value for column filtering. Mirrors renderCell's shape
- *  but returns a plain string (or null) instead of JSX. */
+ *  but returns a plain string (or null) — or a string[] for multi-value
+ *  columns like Schemes. */
 function columnFilterValue(
   key: ColKey,
   p: ProjectListItem,
   districtsById: Map<number, string>,
   divisionsById: Map<number, { name: string; regionName: string }>,
   sectorsById: Map<number, string>,
-  _schemesById: Map<number, string>,
-): string | null {
-  void _schemesById;
+  schemesById: Map<number, string>,
+): string | string[] | null {
+  void districtsById;
   switch (key) {
     case 'city':          return p.city;
-    case 'district':      return p.districtId != null ? districtsById.get(p.districtId) ?? null : null;
     case 'division':      return p.divisionId != null ? divisionsById.get(p.divisionId)?.name ?? null : null;
     case 'region':        return p.divisionId != null ? divisionsById.get(p.divisionId)?.regionName ?? null : null;
     case 'contractor':    return p.contractor;
     case 'pd':            return p.pd;
     case 'sector':        return p.sectorId != null ? sectorsById.get(p.sectorId) ?? null : null;
+    case 'schemes': {
+      if (!p.schemes || p.schemes.length === 0) return null;
+      return p.schemes.map((id) => schemesById.get(id) ?? `#${id}`);
+    }
     case 'contractType':  return p.contractType;
     case 'status':        return p.status;
     case 'priority':      return p.priority;

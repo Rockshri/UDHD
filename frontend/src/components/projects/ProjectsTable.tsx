@@ -23,9 +23,12 @@ export interface Column {
   defaultVisible?: boolean;
   render: (row: ProjectListItem, index: number, ctx: LookupCtx) => React.ReactNode;
   sortValue?: (row: ProjectListItem) => string | number | null;
-  /** Bucket the row's value for column-level filtering. Undefined = no
-   *  filter icon on this column (e.g. progress bars, action buttons). */
-  filterValue?: (row: ProjectListItem, ctx: LookupCtx) => string | number | null | undefined;
+  /** Bucket the row's value for column-level filtering. Return a scalar
+   *  for single-value columns or an array for multi-value ones (e.g.
+   *  Schemes). Undefined = no filter icon (progress bars, action buttons). */
+  filterValue?: (row: ProjectListItem, ctx: LookupCtx) =>
+    | string | number | null | undefined
+    | readonly (string | number | null | undefined)[];
 }
 
 interface LookupCtx {
@@ -63,16 +66,8 @@ const COLUMNS: Column[] = [
     sortValue: (r) => r.city,
     filterValue: (r) => r.city,
   },
-  {
-    key: 'district',
-    label: 'District',
-    minWidth: 110,
-    defaultVisible: true,
-    render: (r, _i, ctx) =>
-      r.districtId ? (ctx.districtById.get(r.districtId) ?? '—') : '—',
-    sortValue: (r) => r.districtId,
-    filterValue: (r, ctx) => (r.districtId ? ctx.districtById.get(r.districtId) : null),
-  },
+  // District column removed per request — Division is the primary
+  // geographic dimension in the register now.
   {
     key: 'division',
     label: 'Division',
@@ -144,6 +139,12 @@ const COLUMNS: Column[] = [
       );
     },
     sortValue: (r) => (r.schemes && r.schemes.length > 0 ? r.schemes[0] ?? null : null),
+    // Multi-value: a row matches if ANY of its schemes is in the selected
+    // set. Returning an array is the shape useColumnFilters supports.
+    filterValue: (r, ctx) => {
+      if (!r.schemes || r.schemes.length === 0) return null;
+      return r.schemes.map((id) => ctx.schemeById.get(id) ?? `#${id}`);
+    },
   },
   // Note: 'division' + 'region' columns are inserted alongside 'district' above.
   {

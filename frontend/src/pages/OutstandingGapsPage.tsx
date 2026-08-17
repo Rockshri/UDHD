@@ -17,11 +17,6 @@ export function OutstandingGapsPage(): JSX.Element {
   const [priority, setPriority] = useState<Priority | 'All'>('All');
   const [search, setSearch] = useState('');
 
-  const districtsById = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const d of lookups.data?.districts ?? []) map.set(d.districtId, d.districtName);
-    return map;
-  }, [lookups.data]);
   const sectorsById = useMemo(() => {
     const map = new Map<number, string>();
     for (const s of lookups.data?.sectors ?? []) map.set(s.sectorId, s.sectorName);
@@ -109,7 +104,6 @@ export function OutstandingGapsPage(): JSX.Element {
                     <th className="px-4 py-2 text-left">#</th>
                     <th className="px-4 py-2 text-left">Project</th>
                     <th className="px-4 py-2 text-left">Sector</th>
-                    <th className="px-4 py-2 text-left">District</th>
                     <th className="px-4 py-2 text-left">Priority</th>
                     <th className="px-4 py-2 text-left">Status</th>
                     <th className="px-4 py-2 text-left">Gap / Remark</th>
@@ -135,9 +129,6 @@ export function OutstandingGapsPage(): JSX.Element {
                       </td>
                       <td className="px-4 py-2 text-[#374151]">
                         {r.sectorId ? sectorsById.get(r.sectorId) ?? `#${r.sectorId}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-[#374151]">
-                        {r.districtId ? districtsById.get(r.districtId) ?? `#${r.districtId}` : '—'}
                       </td>
                       <td className="px-4 py-2">
                         <PriorityBadge priority={r.priority} />

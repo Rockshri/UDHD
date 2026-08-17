@@ -27,7 +27,13 @@ import { useCallback, useMemo, useState } from 'react';
 
 export const EMPTY_BUCKET = '—';
 
-export type ColumnAccessor<T> = (row: T) => string | number | boolean | null | undefined;
+/**
+ * Accessors may return a single scalar or an array of scalars. Arrays
+ * enable multi-value columns like "Schemes" — a project can belong to
+ * several schemes, and any one of them satisfies a scheme-filter selection.
+ */
+export type ColumnAccessorValue = string | number | boolean | null | undefined;
+export type ColumnAccessor<T> = (row: T) => ColumnAccessorValue | readonly ColumnAccessorValue[];
 
 export interface ColumnFiltersConfig<T> {
   rows: readonly T[];
@@ -45,10 +51,32 @@ export interface ColumnFilters<T> {
   activeCount: number;
 }
 
-function toBucket(v: unknown): string {
+function toBucketOne(v: unknown): string {
   if (v === null || v === undefined) return EMPTY_BUCKET;
   const s = String(v).trim();
   return s === '' ? EMPTY_BUCKET : s;
+}
+
+/**
+ * Scalar → [bucket]; array → deduped list of buckets (empty array
+ * becomes ['—'] so rows without any tag still get grouped). Used both
+ * for computing distinct options and for match testing.
+ */
+function toBuckets(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    if (v.length === 0) return [EMPTY_BUCKET];
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const item of v) {
+      const b = toBucketOne(item);
+      if (!seen.has(b)) {
+        seen.add(b);
+        out.push(b);
+      }
+    }
+    return out;
+  }
+  return [toBucketOne(v)];
 }
 
 export function useColumnFilters<T>({ rows, columns }: ColumnFiltersConfig<T>): ColumnFilters<T> {
@@ -62,8 +90,14 @@ export function useColumnFilters<T>({ rows, columns }: ColumnFiltersConfig<T>): 
         const accessor = columns[col];
         const wanted = state[col];
         if (!accessor || !wanted) continue;
-        const bucket = toBucket(accessor(row));
-        if (!wanted.has(bucket)) return false;
+        // Multi-value columns match if ANY bucket is selected; scalar
+        // columns are a special case of the same rule with one bucket.
+        const buckets = toBuckets(accessor(row));
+        let hit = false;
+        for (const b of buckets) {
+          if (wanted.has(b)) { hit = true; break; }
+        }
+        if (!hit) return false;
       }
       return true;
     });
@@ -76,7 +110,9 @@ export function useColumnFilters<T>({ rows, columns }: ColumnFiltersConfig<T>): 
       // Distinct values are computed against ALL rows, not filteredRows, so
       // deselecting a value doesn't cause it to vanish from the popover.
       const seen = new Set<string>();
-      for (const row of rows) seen.add(toBucket(accessor(row)));
+      for (const row of rows) {
+        for (const b of toBuckets(accessor(row))) seen.add(b);
+      }
       return Array.from(seen).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     },
     [rows, columns],

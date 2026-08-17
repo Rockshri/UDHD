@@ -30,11 +30,6 @@ export function CosEotPage(): JSX.Element {
   });
   const lookups = useGetLookupsQuery();
 
-  const districtsById = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const d of lookups.data?.districts ?? []) map.set(d.districtId, d.districtName);
-    return map;
-  }, [lookups.data]);
   const sectorsById = useMemo(() => {
     const map = new Map<number, string>();
     for (const s of lookups.data?.sectors ?? []) map.set(s.sectorId, s.sectorName);
@@ -124,7 +119,6 @@ export function CosEotPage(): JSX.Element {
                     <th className="px-3 py-2 text-left">#</th>
                     <th className="px-3 py-2 text-left">Project</th>
                     <th className="px-3 py-2 text-left">Sector</th>
-                    <th className="px-3 py-2 text-left">District</th>
                     <th className="px-3 py-2 text-left">CoS #</th>
                     <th className="px-3 py-2 text-left">CoS Date</th>
                     <th className="px-3 py-2 text-left">Category</th>
@@ -155,9 +149,6 @@ export function CosEotPage(): JSX.Element {
                       </td>
                       <td className="px-3 py-2 text-[#374151]">
                         {r.sectorId ? sectorsById.get(r.sectorId) ?? `#${r.sectorId}` : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-[#374151]">
-                        {r.districtId ? districtsById.get(r.districtId) ?? `#${r.districtId}` : '—'}
                       </td>
                       <td className="px-3 py-2 font-semibold text-[#7C3AED]">
                         {r.cosNumber ?? '—'}
