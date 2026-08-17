@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0F172A" />
     <title>BUIDCO Project Monitoring Dashboard</title>
+    <script>
+      // Set theme class before React paints to avoid a light-mode flash on
+      // dark-mode users. Mirrors the logic in src/hooks/useTheme.ts —
+      // storage key must stay in sync.
+      (function () {
+        try {
+          var stored = localStorage.getItem('buidco.theme.v1');
+          var isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var applied = stored === 'dark' || stored === 'light'
+            ? stored
+            : (isSystemDark ? 'dark' : 'light');
+          if (applied === 'dark') document.documentElement.classList.add('dark');
+        } catch (_) { /* localStorage blocked */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

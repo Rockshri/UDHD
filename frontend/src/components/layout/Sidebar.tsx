@@ -17,6 +17,8 @@ import {
   History,
   LayoutDashboard,
   Map,
+  Moon,
+  Sun,
   Tag,
   Users,
   Wrench,
@@ -24,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { openMdBriefing, selectCurrentUser } from '../../features/auth/authSlice';
+import { useTheme } from '../../hooks/useTheme';
 import { cn } from '../../lib/utils';
 import { RoleGate } from '../auth/RoleGate';
 import type { UserRole } from '../../types/api';
@@ -77,6 +80,7 @@ export function Sidebar({
 }: Props): JSX.Element {
   const currentUser = useAppSelector(selectCurrentUser);
   const dispatch = useAppDispatch();
+  const theme = useTheme();
   const role = currentUser?.role;
   const visibleNav = PRIMARY_NAV.filter(
     (item) => !item.hideFor || !role || !item.hideFor.includes(role),
@@ -306,8 +310,65 @@ export function Sidebar({
             </ul>
           </div>
         </nav>
+
+        {/* ── Theme toggle — pinned to the very bottom of the sidebar ── */}
+        <div
+          className={cn(
+            'shrink-0 border-t border-[#E5E7EB] px-2 py-2',
+            collapsed ? 'lg:px-1.5' : '',
+          )}
+        >
+          <ThemeToggle
+            applied={theme.applied}
+            onToggle={theme.toggle}
+            collapsed={collapsed}
+          />
+        </div>
       </aside>
     </>
+  );
+}
+
+/**
+ * Sun/moon toggle. Reflects the currently-applied theme (so a 'system'
+ * preference still shows the correct icon). Full-width label when the
+ * sidebar is expanded, icon-only when collapsed.
+ */
+function ThemeToggle({
+  applied, onToggle, collapsed,
+}: {
+  applied: 'light' | 'dark';
+  onToggle: () => void;
+  collapsed: boolean;
+}): JSX.Element {
+  const isDark = applied === 'dark';
+  const Icon = isDark ? Sun : Moon;
+  const label = isDark ? 'Light mode' : 'Dark mode';
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={collapsed ? label : undefined}
+      aria-label={label}
+      className={cn(
+        'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[12.5px] font-medium text-[#4B5563] transition-colors hover:bg-[#F3F4F6] hover:text-[#111827]',
+        collapsed && 'lg:justify-center lg:px-1.5',
+      )}
+    >
+      <Icon
+        size={17}
+        className="shrink-0 text-[#6B7280] group-hover:text-[#374151]"
+        aria-hidden
+      />
+      <span
+        className={cn(
+          'truncate transition-opacity',
+          collapsed ? 'lg:hidden' : 'inline',
+        )}
+      >
+        {label}
+      </span>
+    </button>
   );
 }
 

@@ -56,4 +56,107 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
+
+  html.dark {
+    color-scheme: dark;
+  }
+}
+
+/* ── Dark-mode token overrides (outside @layer so they emit last and
+   win regardless of Tailwind's layer ordering) ─────────────────────────
+   The codebase uses Tailwind arbitrary-value classes like `bg-[#F9FAFB]`
+   for its palette. Rather than rewriting every component with dark:
+   variants, we map the ~30 most-used hex tokens under html.dark so a
+   single stylesheet re-themes the whole app. Per-component polish
+   (badges, charts, gradients baked into inline style attributes) can
+   layer on top.
+
+   Rule of thumb for choices:
+     - Backgrounds: white → slate-900, gray-50 → slate-800, gray-100 → slate-700
+     - Body text (numbers, labels): near-black → near-white so KPI digits
+       stay high-contrast — that was the specific ask.
+     - Brand navy (#1E3A5F) text is invisible on dark; map to sky-300
+       (#93C5FD) so KPI values / stat card values / active headers pop.
+     - Status color text (green/red/amber) shifts to the lighter tone so
+       it reads on dark surfaces without losing meaning.
+     - Status-tint backgrounds are made subtly translucent so the tone
+       remains readable but doesn't glare.                                 */
+
+html.dark .bg-white              { background-color: #0F172A; }
+html.dark .bg-\[\#F4F6F9\]        { background-color: #0B1220; }  /* app body */
+html.dark .bg-\[\#F9FAFB\]        { background-color: #1E293B; }
+html.dark .bg-\[\#F3F4F6\]        { background-color: #334155; }
+html.dark .bg-\[\#FAFAFA\]        { background-color: #1F2937; }
+html.dark .bg-\[\#F0F7FF\]        { background-color: rgba(37, 99, 235, 0.15); }
+html.dark .bg-\[\#EFF6FF\]        { background-color: rgba(37, 99, 235, 0.18); }
+html.dark .bg-\[\#F0F4F8\]        { background-color: #1F2937; }
+
+/* Status-tint backgrounds */
+html.dark .bg-\[\#DBEAFE\]        { background-color: rgba(29, 78, 216, 0.25); }
+html.dark .bg-\[\#DCFCE7\]        { background-color: rgba(21, 128, 61, 0.25); }
+html.dark .bg-\[\#F0FDF4\]        { background-color: rgba(21, 128, 61, 0.15); }
+html.dark .bg-\[\#FEE2E2\]        { background-color: rgba(185, 28, 28, 0.25); }
+html.dark .bg-\[\#FEF2F2\]        { background-color: rgba(185, 28, 28, 0.18); }
+html.dark .bg-\[\#FEF3C7\]        { background-color: rgba(180, 83, 9, 0.28); }
+html.dark .bg-\[\#FFFBEB\]        { background-color: rgba(180, 83, 9, 0.15); }
+html.dark .bg-\[\#ECFDF5\]        { background-color: rgba(5, 150, 105, 0.18); }
+
+/* Text — neutrals. Numbers (near-black) go to near-white for max contrast. */
+html.dark .text-\[\#111827\]      { color: #F8FAFC; }
+html.dark .text-\[\#1F2937\]      { color: #E5E7EB; }
+html.dark .text-\[\#374151\]      { color: #E2E8F0; }
+html.dark .text-\[\#4B5563\]      { color: #CBD5E1; }
+html.dark .text-\[\#6B7280\]      { color: #94A3B8; }
+html.dark .text-\[\#9CA3AF\]      { color: #64748B; }
+html.dark .text-\[\#D1D5DB\]      { color: #475569; }
+
+/* Text — brand + link. Navy is invisible on dark; swap to sky-300/blue-400. */
+html.dark .text-\[\#1E3A5F\]      { color: #93C5FD; }
+html.dark .text-\[\#152a48\]      { color: #BFDBFE; }
+html.dark .text-\[\#1D4ED8\]      { color: #60A5FA; }
+html.dark .text-\[\#2563EB\]      { color: #93C5FD; }
+html.dark .text-\[\#7C3AED\]      { color: #C4B5FD; }
+html.dark .text-\[\#6D28D9\]      { color: #C4B5FD; }
+
+/* Text — status colors. Bump to lighter tones so they pop on dark bg. */
+html.dark .text-\[\#15803D\]      { color: #4ADE80; }
+html.dark .text-\[\#B91C1C\]      { color: #F87171; }
+html.dark .text-\[\#7F1D1D\]      { color: #FCA5A5; }
+html.dark .text-\[\#B45309\]      { color: #FBBF24; }
+html.dark .text-\[\#059669\]      { color: #34D399; }
+
+/* Borders */
+html.dark .border-\[\#E5E7EB\]    { border-color: #334155; }
+html.dark .border-\[\#F3F4F6\]    { border-color: #1F2937; }
+html.dark .border-\[\#D1D5DB\]    { border-color: #475569; }
+html.dark .border-\[\#BFDBFE\]    { border-color: #1E40AF; }
+html.dark .border-\[\#93C5FD\]    { border-color: #2563EB; }
+html.dark .border-\[\#FCA5A5\]    { border-color: #B91C1C; }
+html.dark .border-\[\#F59E0B\]    { border-color: #F59E0B; }
+html.dark .border-\[\#86EFAC\]    { border-color: #15803D; }
+html.dark .border-\[\#FDE68A\]    { border-color: #B45309; }
+html.dark .border-\[\#1E3A5F\]    { border-color: #60A5FA; }
+
+/* Top-border tone accents (StatCard etc.) */
+html.dark .border-t-\[\#1E3A5F\]  { border-top-color: #60A5FA; }
+html.dark .border-t-\[\#1D4ED8\]  { border-top-color: #60A5FA; }
+html.dark .border-t-\[\#15803D\]  { border-top-color: #4ADE80; }
+html.dark .border-t-\[\#B91C1C\]  { border-top-color: #F87171; }
+html.dark .border-t-\[\#B45309\]  { border-top-color: #FBBF24; }
+html.dark .border-t-\[\#6B7280\]  { border-top-color: #94A3B8; }
+html.dark .border-t-\[\#9CA3AF\]  { border-top-color: #64748B; }
+
+/* Left-border tone accents (StatCard variants) */
+html.dark .border-l-\[\#1E3A5F\]  { border-left-color: #60A5FA; }
+html.dark .border-l-\[\#15803D\]  { border-left-color: #4ADE80; }
+html.dark .border-l-\[\#1D4ED8\]  { border-left-color: #60A5FA; }
+html.dark .border-l-\[\#B45309\]  { border-left-color: #FBBF24; }
+html.dark .border-l-\[\#B91C1C\]  { border-left-color: #F87171; }
+html.dark .border-l-\[\#6B7280\]  { border-left-color: #94A3B8; }
+
+/* Native form controls inherit dark UA styling */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  color-scheme: dark;
 }
