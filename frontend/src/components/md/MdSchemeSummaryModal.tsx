@@ -10,6 +10,8 @@ import { useAppSelector } from '../../app/hooks';
 import { selectAccessToken } from '../../features/auth/authSlice';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
+import { ColumnFilterButton } from '../table/ColumnFilterButton';
+import { useColumnFilters, type ColumnAccessor } from '../table/useColumnFilters';
 import { OmAlertCell } from '../projects/OmAlertCell';
 import { PbgAlertCell } from '../projects/PbgAlertCell';
 import { PriorityBadge } from '../projects/PriorityBadge';
@@ -1195,18 +1197,56 @@ function ProjectList({
   sectorsById: Map<number, string>;
   schemesById: Map<number, string>;
 }): JSX.Element {
+  // Column-level filters combine on top of the modal's own filter row.
+  const columnAccessors = useMemo(() => {
+    const out: Record<string, ColumnAccessor<ProjectListItem>> = {};
+    for (const c of columns) {
+      if (!COLUMN_FILTERABLE.has(c.key)) continue;
+      out[c.key] = (p) =>
+        columnFilterValue(c.key, p, districtsById, divisionsById, sectorsById, schemesById);
+    }
+    return out;
+  }, [columns, districtsById, divisionsById, sectorsById, schemesById]);
+  const colFilters = useColumnFilters<ProjectListItem>({ rows: projects, columns: columnAccessors });
+
   return (
     <div className="overflow-x-auto rounded-lg border border-[#E5E7EB] bg-white shadow-sm">
+      {colFilters.activeCount > 0 ? (
+        <div className="flex items-center justify-between border-b border-[#F3F4F6] bg-[#F9FAFB] px-3 py-1.5">
+          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[#6B7280]">
+            {colFilters.filteredRows.length} of {projects.length} match {colFilters.activeCount}{' '}
+            column filter{colFilters.activeCount === 1 ? '' : 's'}
+          </span>
+          <button
+            type="button"
+            onClick={colFilters.clearAll}
+            className="text-[11px] font-semibold text-[#B91C1C] hover:underline"
+          >
+            ✕ Clear
+          </button>
+        </div>
+      ) : null}
       <table className="w-full min-w-[720px] border-collapse text-[12px]">
         <thead>
           <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-            {columns.map((c) => (
-              <th key={c.key} className="whitespace-nowrap px-3 py-2 text-left">{c.label}</th>
+            {columns.map((c, idx) => (
+              <th key={c.key} className="whitespace-nowrap px-3 py-2 text-left">
+                {c.label}
+                {COLUMN_FILTERABLE.has(c.key) ? (
+                  <ColumnFilterButton
+                    label={c.label}
+                    options={colFilters.optionsFor(c.key)}
+                    selected={colFilters.selected(c.key)}
+                    onChange={(next) => colFilters.setSelected(c.key, next)}
+                    align={idx >= columns.length - 2 ? 'end' : 'start'}
+                  />
+                ) : null}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {projects.map((p, idx) => {
+          {colFilters.filteredRows.map((p, idx) => {
             const isActive = p.projectId === activeProjectId;
             return (
               <tr
@@ -1243,6 +1283,42 @@ function ProjectList({
       </table>
     </div>
   );
+}
+
+/** Columns whose values bucket meaningfully — skip pure-visual cells
+ *  (progress bars, alerts) and free-text unique columns (project name). */
+const COLUMN_FILTERABLE = new Set<ColKey>([
+  'city', 'district', 'division', 'region', 'contractor', 'pd', 'sector',
+  'contractType', 'status', 'priority', 'outstandingGap',
+]);
+
+/** Bucket a cell value for column filtering. Mirrors renderCell's shape
+ *  but returns a plain string (or null) instead of JSX. */
+function columnFilterValue(
+  key: ColKey,
+  p: ProjectListItem,
+  districtsById: Map<number, string>,
+  divisionsById: Map<number, { name: string; regionName: string }>,
+  sectorsById: Map<number, string>,
+  _schemesById: Map<number, string>,
+): string | null {
+  void _schemesById;
+  switch (key) {
+    case 'city':          return p.city;
+    case 'district':      return p.districtId != null ? districtsById.get(p.districtId) ?? null : null;
+    case 'division':      return p.divisionId != null ? divisionsById.get(p.divisionId)?.name ?? null : null;
+    case 'region':        return p.divisionId != null ? divisionsById.get(p.divisionId)?.regionName ?? null : null;
+    case 'contractor':    return p.contractor;
+    case 'pd':            return p.pd;
+    case 'sector':        return p.sectorId != null ? sectorsById.get(p.sectorId) ?? null : null;
+    case 'contractType':  return p.contractType;
+    case 'status':        return p.status;
+    case 'priority':      return p.priority;
+    case 'outstandingGap':
+      // Free-text remark buckets to Yes/No so the filter dropdown is useful.
+      return p.remark && p.remark.trim() !== '' ? 'Yes' : 'No';
+    default:              return null;
+  }
 }
 
 // ── LEFT panel: customizable project details ────────────────────────────────

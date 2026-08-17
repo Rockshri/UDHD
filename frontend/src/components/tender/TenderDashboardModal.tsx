@@ -22,6 +22,8 @@ import { cn } from '../../lib/utils';
 import { formatDate } from '../../lib/formatters';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
+import { ColumnFilterButton } from '../table/ColumnFilterButton';
+import { useColumnFilters, type ColumnAccessor } from '../table/useColumnFilters';
 
 interface Props {
   open: boolean;
@@ -489,6 +491,16 @@ function StagesTab({
 }): JSX.Element {
   const selectionCount = selectedIds.size;
 
+  const columnAccessors = useMemo<Record<string, ColumnAccessor<ProjectListItem>>>(() => ({
+    division: (p) =>
+      p.divisionId ? lookups?.divisions.find((d) => d.divisionId === p.divisionId)?.divisionName ?? null : null,
+    contractor: (p) => p.contractor,
+    nitStatus: (p) => (p.nitNumber && p.nitNumber.trim() !== '' ? 'Published' : 'Yet to be Published'),
+    remark: (p) => ((p.tenderRemark ?? '').trim() !== '' ? 'Stuck' : 'No remark'),
+  }), [lookups]);
+  const colFilters = useColumnFilters<ProjectListItem>({ rows: projects, columns: columnAccessors });
+  const filteredProjects = colFilters.filteredRows;
+
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto">
@@ -602,43 +614,93 @@ function StagesTab({
             No projects currently in this sub-stage.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] border-collapse text-[12px]">
-              <thead>
-                <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-                  <th className="w-8 px-2 py-2">
-                    <span className="sr-only">Select</span>
-                  </th>
-                  <th className="px-3 py-2 text-left">Project Name</th>
-                  <th className="px-3 py-2 text-left">Division</th>
-                  <th className="px-3 py-2 text-left">Contractor</th>
-                  <th className="px-3 py-2 text-left">NIT Number</th>
-                  <th className="px-3 py-2 text-left">NIT Date</th>
-                  {stagesActive === 'NIT Published' ? (
-                    <th className="px-3 py-2 text-left">
-                      <span className="sr-only">NIT actions</span>
+          <div>
+            {colFilters.activeCount > 0 ? (
+              <div className="flex items-center justify-between border-b border-[#F3F4F6] bg-[#F9FAFB] px-3 py-1.5">
+                <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[#6B7280]">
+                  {filteredProjects.length} of {projects.length} match {colFilters.activeCount}{' '}
+                  column filter{colFilters.activeCount === 1 ? '' : 's'}
+                </span>
+                <button
+                  type="button"
+                  onClick={colFilters.clearAll}
+                  className="text-[11px] font-semibold text-[#B91C1C] hover:underline"
+                >
+                  ✕ Clear
+                </button>
+              </div>
+            ) : null}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1080px] border-collapse text-[12px]">
+                <thead>
+                  <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
+                    <th className="w-8 px-2 py-2">
+                      <span className="sr-only">Select</span>
                     </th>
-                  ) : null}
-                  <th className="px-3 py-2 text-left">Remark</th>
-                  <th className="px-3 py-2 text-left">Last Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projects.map((p) => (
-                  <StageProjectRow
-                    key={p.projectId}
-                    project={p}
-                    lookups={lookups}
-                    checked={selectedIds.has(p.projectId)}
-                    onToggle={() => onToggleSelect(p.projectId)}
-                    disableCheckbox={!canTransfer || busy}
-                    isNitPublished={stagesActive === 'NIT Published'}
-                    canEditNit={canTransfer}
-                    canEditRemark={canTransfer}
-                  />
-                ))}
-              </tbody>
-            </table>
+                    <th className="px-3 py-2 text-left">Project Name</th>
+                    <th className="px-3 py-2 text-left">
+                      Division
+                      <ColumnFilterButton
+                        label="Division"
+                        options={colFilters.optionsFor('division')}
+                        selected={colFilters.selected('division')}
+                        onChange={(next) => colFilters.setSelected('division', next)}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">
+                      Contractor
+                      <ColumnFilterButton
+                        label="Contractor"
+                        options={colFilters.optionsFor('contractor')}
+                        selected={colFilters.selected('contractor')}
+                        onChange={(next) => colFilters.setSelected('contractor', next)}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">
+                      NIT Number
+                      <ColumnFilterButton
+                        label="NIT Status"
+                        options={colFilters.optionsFor('nitStatus')}
+                        selected={colFilters.selected('nitStatus')}
+                        onChange={(next) => colFilters.setSelected('nitStatus', next)}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">NIT Date</th>
+                    {stagesActive === 'NIT Published' ? (
+                      <th className="px-3 py-2 text-left">
+                        <span className="sr-only">NIT actions</span>
+                      </th>
+                    ) : null}
+                    <th className="px-3 py-2 text-left">
+                      Remark
+                      <ColumnFilterButton
+                        label="Remark"
+                        options={colFilters.optionsFor('remark')}
+                        selected={colFilters.selected('remark')}
+                        onChange={(next) => colFilters.setSelected('remark', next)}
+                        align="end"
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">Last Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProjects.map((p) => (
+                    <StageProjectRow
+                      key={p.projectId}
+                      project={p}
+                      lookups={lookups}
+                      checked={selectedIds.has(p.projectId)}
+                      onToggle={() => onToggleSelect(p.projectId)}
+                      disableCheckbox={!canTransfer || busy}
+                      isNitPublished={stagesActive === 'NIT Published'}
+                      canEditNit={canTransfer}
+                      canEditRemark={canTransfer}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>

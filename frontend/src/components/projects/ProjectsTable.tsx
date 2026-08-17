@@ -5,6 +5,8 @@ import { displayNitDate, displayNitNumber } from '../../features/tender/tenderWo
 import { formatCurrencyCr, formatDate } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
+import { ColumnFilterButton } from '../table/ColumnFilterButton';
+import { useColumnFilters, type ColumnAccessor } from '../table/useColumnFilters';
 import { OmAlertCell } from './OmAlertCell';
 import { PbgAlertCell } from './PbgAlertCell';
 import { PriorityBadge } from './PriorityBadge';
@@ -21,6 +23,9 @@ export interface Column {
   defaultVisible?: boolean;
   render: (row: ProjectListItem, index: number, ctx: LookupCtx) => React.ReactNode;
   sortValue?: (row: ProjectListItem) => string | number | null;
+  /** Bucket the row's value for column-level filtering. Undefined = no
+   *  filter icon on this column (e.g. progress bars, action buttons). */
+  filterValue?: (row: ProjectListItem, ctx: LookupCtx) => string | number | null | undefined;
 }
 
 interface LookupCtx {
@@ -56,6 +61,7 @@ const COLUMNS: Column[] = [
     defaultVisible: true,
     render: (r) => r.city ?? '—',
     sortValue: (r) => r.city,
+    filterValue: (r) => r.city,
   },
   {
     key: 'district',
@@ -65,6 +71,7 @@ const COLUMNS: Column[] = [
     render: (r, _i, ctx) =>
       r.districtId ? (ctx.districtById.get(r.districtId) ?? '—') : '—',
     sortValue: (r) => r.districtId,
+    filterValue: (r, ctx) => (r.districtId ? ctx.districtById.get(r.districtId) : null),
   },
   {
     key: 'division',
@@ -74,6 +81,7 @@ const COLUMNS: Column[] = [
     render: (r, _i, ctx) =>
       r.divisionId ? (ctx.divisionById.get(r.divisionId)?.name ?? '—') : '—',
     sortValue: (r) => r.divisionId,
+    filterValue: (r, ctx) => (r.divisionId ? ctx.divisionById.get(r.divisionId)?.name : null),
   },
   {
     key: 'region',
@@ -85,6 +93,7 @@ const COLUMNS: Column[] = [
     // Sort proxies on divisionId (South Bihar IDs precede North Bihar per the
     // migration insert order) so we don't need lookup ctx in sortValue.
     sortValue: (r) => r.divisionId,
+    filterValue: (r, ctx) => (r.divisionId ? ctx.divisionById.get(r.divisionId)?.regionName : null),
   },
   {
     key: 'contractor',
@@ -93,6 +102,7 @@ const COLUMNS: Column[] = [
     defaultVisible: true,
     render: (r) => (r.contractor ? <span className="truncate">{r.contractor}</span> : '—'),
     sortValue: (r) => r.contractor,
+    filterValue: (r) => r.contractor,
   },
   {
     key: 'pd',
@@ -101,6 +111,7 @@ const COLUMNS: Column[] = [
     defaultVisible: false,
     render: (r) => r.pd ?? '—',
     sortValue: (r) => r.pd,
+    filterValue: (r) => r.pd,
   },
   {
     key: 'sectorName',
@@ -109,6 +120,7 @@ const COLUMNS: Column[] = [
     defaultVisible: true,
     render: (r, _i, ctx) => (r.sectorId ? (ctx.sectorById.get(r.sectorId) ?? '—') : '—'),
     sortValue: (r) => r.sectorId,
+    filterValue: (r, ctx) => (r.sectorId ? ctx.sectorById.get(r.sectorId) : null),
   },
   {
     key: 'schemes',
@@ -141,6 +153,7 @@ const COLUMNS: Column[] = [
     defaultVisible: false,
     render: (r) => r.projectStageV2 ?? '—',
     sortValue: (r) => r.projectStageV2,
+    filterValue: (r) => r.projectStageV2,
   },
   {
     key: 'contractType',
@@ -149,6 +162,7 @@ const COLUMNS: Column[] = [
     defaultVisible: false,
     render: (r) => r.contractType ?? '—',
     sortValue: (r) => r.contractType,
+    filterValue: (r) => r.contractType,
   },
   {
     key: 'aaAmountCr',
@@ -220,6 +234,7 @@ const COLUMNS: Column[] = [
     defaultVisible: true,
     render: (r) => <StatusBadge status={r.status} />,
     sortValue: (r) => r.status,
+    filterValue: (r) => r.status,
   },
   {
     key: 'remark',
@@ -235,6 +250,9 @@ const COLUMNS: Column[] = [
         <span className="text-[#D1D5DB]">—</span>
       ),
     sortValue: (r) => r.remark,
+    // Bucket to Yes/No so the column dropdown is useful instead of listing
+    // every free-text remark as its own filter value.
+    filterValue: (r) => (r.remark && r.remark.trim() !== '' ? 'Yes' : 'No'),
   },
   {
     key: 'priority',
@@ -244,6 +262,7 @@ const COLUMNS: Column[] = [
     defaultVisible: true,
     render: (r) => <PriorityBadge priority={r.priority} />,
     sortValue: (r) => r.priority,
+    filterValue: (r) => r.priority,
   },
   {
     key: 'pbgAlert',
@@ -389,6 +408,24 @@ export function ProjectsTable({
   }, [lookups]);
 
   const visibleColumns = COLUMNS.filter((c) => visibility[c.key] !== false);
+
+  // Excel-style per-column filters (session-only). Applies client-side to
+  // the currently-loaded page — for the Projects Register that's whatever
+  // the top ProjectsFilterBar has narrowed down to. Both filter layers
+  // combine (AND) per the spec.
+  const columnAccessors = useMemo(() => {
+    const out: Record<string, ColumnAccessor<ProjectListItem>> = {};
+    for (const c of visibleColumns) {
+      if (!c.filterValue) continue;
+      out[c.key] = (row) => {
+        const v = c.filterValue!(row, ctx);
+        return v ?? null;
+      };
+    }
+    return out;
+  }, [visibleColumns, ctx]);
+  const colFilters = useColumnFilters<ProjectListItem>({ rows, columns: columnAccessors });
+
   // Multi-select is "on" only when a selectedIds Set was passed. That way
   // legacy callers with no selection props render the table as before.
   const selectMode = selectedIds !== undefined;
@@ -414,10 +451,11 @@ export function ProjectsTable({
   };
 
   const sortedRows = useMemo(() => {
-    if (sortKey === 'sno') return rows;
+    const source = colFilters.filteredRows;
+    if (sortKey === 'sno') return source;
     const col = COLUMNS.find((c) => c.key === sortKey);
-    if (!col?.sortValue) return rows;
-    const arr = [...rows];
+    if (!col?.sortValue) return source;
+    const arr = [...source];
     arr.sort((a, b) => {
       const av = col.sortValue!(a);
       const bv = col.sortValue!(b);
@@ -428,7 +466,7 @@ export function ProjectsTable({
       return 0;
     });
     return arr;
-  }, [rows, sortKey, sortDir]);
+  }, [colFilters.filteredRows, sortKey, sortDir]);
 
   const onSort = (key: string): void => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -443,10 +481,18 @@ export function ProjectsTable({
     <div className="rounded-lg border border-[#E5E7EB] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#F3F4F6] px-3 py-2">
         <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[#6B7280]">
-          {rows.length} project{rows.length === 1 ? '' : 's'} on this page
+          {colFilters.activeCount > 0
+            ? `${sortedRows.length} of ${rows.length} on this page match ${colFilters.activeCount} column filter${colFilters.activeCount === 1 ? '' : 's'}`
+            : `${rows.length} project${rows.length === 1 ? '' : 's'} on this page`}
           {isFetching ? ' · refreshing…' : ''}
         </span>
-        <div className="relative">
+        <div className="flex items-center gap-2">
+          {colFilters.activeCount > 0 ? (
+            <Button variant="ghost" size="sm" onClick={colFilters.clearAll}>
+              ✕ Clear column filters
+            </Button>
+          ) : null}
+          <div className="relative">
           <Button
             variant="outline"
             size="sm"
@@ -484,6 +530,7 @@ export function ProjectsTable({
             </div>
           ) : null}
         </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -508,7 +555,7 @@ export function ProjectsTable({
                   />
                 </th>
               ) : null}
-              {visibleColumns.map((c) => (
+              {visibleColumns.map((c, idx) => (
                 <th
                   key={c.key}
                   scope="col"
@@ -530,6 +577,17 @@ export function ProjectsTable({
                   ) : (
                     c.label
                   )}
+                  {c.filterValue ? (
+                    <ColumnFilterButton
+                      label={c.label}
+                      options={colFilters.optionsFor(c.key)}
+                      selected={colFilters.selected(c.key)}
+                      onChange={(next) => colFilters.setSelected(c.key, next)}
+                      // Rightmost couple of columns anchor their popover to the
+                      // right so it doesn't get clipped off the table edge.
+                      align={idx >= visibleColumns.length - 3 ? 'end' : 'start'}
+                    />
+                  ) : null}
                 </th>
               ))}
             </tr>
