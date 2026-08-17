@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export interface MoneyStrip {
@@ -30,6 +31,11 @@ interface Props {
   onMetricClick?: (metric: SummaryCardMetric) => void;
   /** Which per-metric drill is currently open. Only meaningful with `onMetricClick`. */
   activeMetric?: SummaryCardMetric | null;
+  /** Optional rename/delete affordances rendered as small icon buttons
+   *  in the card's top-right corner. Each stopPropagation so they don't
+   *  fire the whole-card drill handler. */
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 /**
@@ -60,6 +66,8 @@ export function SummaryCard({
   onClick,
   onMetricClick,
   activeMetric = null,
+  onEdit,
+  onDelete,
 }: Props): JSX.Element {
   const utilPct =
     money && money.allotedCr !== null && money.spentCr !== null && money.allotedCr > 0
@@ -90,6 +98,45 @@ export function SummaryCard({
 
   const inner = (
     <>
+      {/* Rename / delete overlay — top-right corner, MD/Admin only via
+          callback presence. stopPropagation so the drill doesn't fire. */}
+      {onEdit || onDelete ? (
+        <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-0.5">
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              title="Rename"
+              aria-label={`Rename ${name}`}
+              className={cn(
+                'grid h-6 w-6 place-items-center rounded transition-colors',
+                anyActive
+                  ? 'bg-white/15 text-white hover:bg-white/25'
+                  : 'bg-white/60 text-[#6B7280] hover:bg-white hover:text-[#1E3A5F] shadow-sm',
+              )}
+            >
+              <Pencil size={11} aria-hidden />
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              title="Delete"
+              aria-label={`Delete ${name}`}
+              className={cn(
+                'grid h-6 w-6 place-items-center rounded transition-colors',
+                anyActive
+                  ? 'bg-[#EF4444]/30 text-[#FCA5A5] hover:bg-[#EF4444]/45'
+                  : 'bg-white/60 text-[#B91C1C] hover:bg-[#FEE2E2] shadow-sm',
+              )}
+            >
+              <Trash2 size={11} aria-hidden />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Card name — also opens the 'all projects' drill in per-metric mode
           so users have a second click surface besides the big number. */}
       {perMetric ? (

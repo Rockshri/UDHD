@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useGetSectorSummaryQuery } from '../app/api/kpisApi';
-import { useCreateSectorMutation } from '../app/api/lookupsApi';
+import {
+  useCreateSectorMutation,
+  useDeleteSectorMutation,
+  useUpdateSectorMutation,
+} from '../app/api/lookupsApi';
 import { useAppSelector } from '../app/hooks';
 import { selectCurrentUser } from '../features/auth/authSlice';
 import { AddLookupModal } from '../components/summary/AddLookupModal';
@@ -48,9 +52,23 @@ export function SectorsPage(): JSX.Element {
   const summary = useGetSectorSummaryQuery();
   const [drill, setDrill] = useState<DrillState | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ sectorId: number; sectorName: string } | null>(null);
   const currentUser = useAppSelector(selectCurrentUser);
   const canManage = currentUser?.role === 'MD' || currentUser?.role === 'Admin';
   const [createSector, createSectorState] = useCreateSectorMutation();
+  const [updateSector, updateSectorState] = useUpdateSectorMutation();
+  const [deleteSector] = useDeleteSectorMutation();
+
+  const handleDelete = async (row: { sectorId: number; sectorName: string }): Promise<void> => {
+    if (!window.confirm(`Delete sector "${row.sectorName}"? This cannot be undone.`)) return;
+    try {
+      await deleteSector(row.sectorId).unwrap();
+    } catch (e) {
+      const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
+        ?? 'Could not delete sector.';
+      window.alert(msg);
+    }
+  };
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -105,6 +123,22 @@ export function SectorsPage(): JSX.Element {
         saving={createSectorState.isLoading}
         onSave={async (sectorName) => {
           await createSector({ sectorName }).unwrap();
+        }}
+      />
+
+      <AddLookupModal
+        open={renameTarget !== null}
+        onClose={() => setRenameTarget(null)}
+        title={renameTarget ? `Rename “${renameTarget.sectorName}”` : 'Rename Sector'}
+        fieldLabel="Sector name"
+        placeholder="e.g. Water Supply"
+        maxLength={40}
+        initialValue={renameTarget?.sectorName ?? ''}
+        saveLabel="Save changes"
+        saving={updateSectorState.isLoading}
+        onSave={async (sectorName) => {
+          if (!renameTarget) return;
+          await updateSector({ sectorId: renameTarget.sectorId, sectorName }).unwrap();
         }}
       />
 
@@ -176,6 +210,14 @@ export function SectorsPage(): JSX.Element {
               onMetricClick={(metric) =>
                 toggleDrill({ sectorId: row.sectorId, metric })
               }
+              {...(canManage
+                ? {
+                    onEdit: () =>
+                      setRenameTarget({ sectorId: row.sectorId, sectorName: row.sectorName }),
+                    onDelete: () =>
+                      void handleDelete({ sectorId: row.sectorId, sectorName: row.sectorName }),
+                  }
+                : {})}
             />
           ))}
         </div>

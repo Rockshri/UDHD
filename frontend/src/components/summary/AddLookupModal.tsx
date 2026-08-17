@@ -16,21 +16,27 @@ interface Props {
   maxLength: number;
   saving: boolean;
   onSave: (value: string) => Promise<void>;
+  /** When set, the input starts prefilled with this value — used for
+   *  rename flows. Also flips the primary button label to "Save changes"
+   *  and disables Save until the value actually differs. */
+  initialValue?: string;
+  saveLabel?: string;
 }
 
 export function AddLookupModal({
   open, onClose, title, fieldLabel, placeholder, maxLength, saving, onSave,
+  initialValue = '', saveLabel,
 }: Props): JSX.Element | null {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
 
   // Reset local state whenever the modal is (re)opened.
   useEffect(() => {
     if (open) {
-      setValue('');
+      setValue(initialValue);
       setError(null);
     }
-  }, [open]);
+  }, [open, initialValue]);
 
   // Escape to close (unless a save is in flight).
   useEffect(() => {
@@ -45,7 +51,8 @@ export function AddLookupModal({
   if (!open) return null;
 
   const trimmed = value.trim();
-  const canSave = trimmed.length > 0 && !saving;
+  const dirty = trimmed !== initialValue.trim();
+  const canSave = trimmed.length > 0 && dirty && !saving;
 
   const handleSave = async (): Promise<void> => {
     if (!canSave) return;
@@ -116,7 +123,7 @@ export function AddLookupModal({
             Cancel
           </Button>
           <Button variant="default" size="sm" onClick={() => void handleSave()} disabled={!canSave}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving…' : (saveLabel ?? 'Save')}
           </Button>
         </div>
       </div>

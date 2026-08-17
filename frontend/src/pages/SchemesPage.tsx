@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useGetSchemeSummaryQuery, useGetSchemeChartQuery } from '../app/api/kpisApi';
-import { useCreateSchemeMutation } from '../app/api/lookupsApi';
+import {
+  useCreateSchemeMutation,
+  useDeleteSchemeMutation,
+  useUpdateSchemeMutation,
+} from '../app/api/lookupsApi';
 import { useAppSelector } from '../app/hooks';
 import { selectCurrentUser } from '../features/auth/authSlice';
 import { AddLookupModal } from '../components/summary/AddLookupModal';
@@ -50,9 +54,23 @@ export function SchemesPage(): JSX.Element {
   const chart = useGetSchemeChartQuery();
   const [drill, setDrill] = useState<DrillState | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ schemeId: number; schemeName: string } | null>(null);
   const currentUser = useAppSelector(selectCurrentUser);
   const canManage = currentUser?.role === 'MD' || currentUser?.role === 'Admin';
   const [createScheme, createSchemeState] = useCreateSchemeMutation();
+  const [updateScheme, updateSchemeState] = useUpdateSchemeMutation();
+  const [deleteScheme] = useDeleteSchemeMutation();
+
+  const handleDelete = async (row: { schemeId: number; schemeName: string }): Promise<void> => {
+    if (!window.confirm(`Delete scheme "${row.schemeName}"? This cannot be undone.`)) return;
+    try {
+      await deleteScheme(row.schemeId).unwrap();
+    } catch (e) {
+      const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
+        ?? 'Could not delete scheme.';
+      window.alert(msg);
+    }
+  };
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -127,6 +145,22 @@ export function SchemesPage(): JSX.Element {
         saving={createSchemeState.isLoading}
         onSave={async (schemeName) => {
           await createScheme({ schemeName }).unwrap();
+        }}
+      />
+
+      <AddLookupModal
+        open={renameTarget !== null}
+        onClose={() => setRenameTarget(null)}
+        title={renameTarget ? `Rename “${renameTarget.schemeName}”` : 'Rename Scheme'}
+        fieldLabel="Scheme name"
+        placeholder="e.g. AMRUT 2.0"
+        maxLength={60}
+        initialValue={renameTarget?.schemeName ?? ''}
+        saveLabel="Save changes"
+        saving={updateSchemeState.isLoading}
+        onSave={async (schemeName) => {
+          if (!renameTarget) return;
+          await updateScheme({ schemeId: renameTarget.schemeId, schemeName }).unwrap();
         }}
       />
 
@@ -210,6 +244,14 @@ export function SchemesPage(): JSX.Element {
                 onMetricClick={(metric) =>
                   toggleDrill({ schemeId: row.schemeId, metric })
                 }
+                {...(canManage
+                  ? {
+                      onEdit: () =>
+                        setRenameTarget({ schemeId: row.schemeId, schemeName: row.schemeName }),
+                      onDelete: () =>
+                        void handleDelete({ schemeId: row.schemeId, schemeName: row.schemeName }),
+                    }
+                  : {})}
               />
             );
           })}
