@@ -1,8 +1,14 @@
 import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { useGetSchemeSummaryQuery, useGetSchemeChartQuery } from '../app/api/kpisApi';
+import { useCreateSchemeMutation } from '../app/api/lookupsApi';
+import { useAppSelector } from '../app/hooks';
+import { selectCurrentUser } from '../features/auth/authSlice';
+import { AddLookupModal } from '../components/summary/AddLookupModal';
 import { DrillTable } from '../components/summary/DrillTable';
 import { MetricButton } from '../components/summary/MetricButton';
 import { SummaryCard, type SummaryCardMetric } from '../components/summary/SummaryCard';
+import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
@@ -43,6 +49,10 @@ export function SchemesPage(): JSX.Element {
   const summary = useGetSchemeSummaryQuery();
   const chart = useGetSchemeChartQuery();
   const [drill, setDrill] = useState<DrillState | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const currentUser = useAppSelector(selectCurrentUser);
+  const canManage = currentUser?.role === 'MD' || currentUser?.role === 'Admin';
+  const [createScheme, createSchemeState] = useCreateSchemeMutation();
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -92,12 +102,33 @@ export function SchemesPage(): JSX.Element {
 
   return (
     <article className="space-y-4">
-      <header>
-        <h1 className="text-lg font-bold text-[#111827]">Scheme-wise Summary</h1>
-        <p className="text-[12.5px] text-[#6B7280]">
-          Click any card to drill into projects — either portfolio-wide or scoped to a scheme.
-        </p>
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-[#111827]">Scheme-wise Summary</h1>
+          <p className="text-[12.5px] text-[#6B7280]">
+            Click any card to drill into projects — either portfolio-wide or scoped to a scheme.
+          </p>
+        </div>
+        {canManage ? (
+          <Button variant="default" size="sm" onClick={() => setAddOpen(true)}>
+            <Plus size={14} aria-hidden />
+            Add Scheme
+          </Button>
+        ) : null}
       </header>
+
+      <AddLookupModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Add Scheme"
+        fieldLabel="Scheme name"
+        placeholder="e.g. AMRUT 2.0"
+        maxLength={60}
+        saving={createSchemeState.isLoading}
+        onSave={async (schemeName) => {
+          await createScheme({ schemeName }).unwrap();
+        }}
+      />
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         <SchemesCountCard value={totals.schemes} />

@@ -1,8 +1,14 @@
 import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { useGetSectorSummaryQuery } from '../app/api/kpisApi';
+import { useCreateSectorMutation } from '../app/api/lookupsApi';
+import { useAppSelector } from '../app/hooks';
+import { selectCurrentUser } from '../features/auth/authSlice';
+import { AddLookupModal } from '../components/summary/AddLookupModal';
 import { DrillTable } from '../components/summary/DrillTable';
 import { MetricButton } from '../components/summary/MetricButton';
 import { SummaryCard, type SummaryCardMetric } from '../components/summary/SummaryCard';
+import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
@@ -41,6 +47,10 @@ type DrillState = { sectorId: number | null; metric: SummaryCardMetric };
 export function SectorsPage(): JSX.Element {
   const summary = useGetSectorSummaryQuery();
   const [drill, setDrill] = useState<DrillState | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const currentUser = useAppSelector(selectCurrentUser);
+  const canManage = currentUser?.role === 'MD' || currentUser?.role === 'Admin';
+  const [createSector, createSectorState] = useCreateSectorMutation();
 
   const totals = useMemo(() => {
     const items = summary.data?.items ?? [];
@@ -70,12 +80,33 @@ export function SectorsPage(): JSX.Element {
 
   return (
     <article className="space-y-4">
-      <header>
-        <h1 className="text-lg font-bold text-[#111827]">Sector-wise Summary</h1>
-        <p className="text-[12.5px] text-[#6B7280]">
-          Click any card to drill into projects — either portfolio-wide or scoped to a sector.
-        </p>
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-[#111827]">Sector-wise Summary</h1>
+          <p className="text-[12.5px] text-[#6B7280]">
+            Click any card to drill into projects — either portfolio-wide or scoped to a sector.
+          </p>
+        </div>
+        {canManage ? (
+          <Button variant="default" size="sm" onClick={() => setAddOpen(true)}>
+            <Plus size={14} aria-hidden />
+            Add Sector
+          </Button>
+        ) : null}
       </header>
+
+      <AddLookupModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Add Sector"
+        fieldLabel="Sector name"
+        placeholder="e.g. Water Supply"
+        maxLength={40}
+        saving={createSectorState.isLoading}
+        onSave={async (sectorName) => {
+          await createSector({ sectorName }).unwrap();
+        }}
+      />
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {/* Sectors count is a category count, not a project drill → plain label. */}
