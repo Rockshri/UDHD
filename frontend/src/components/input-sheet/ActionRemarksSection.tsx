@@ -39,7 +39,15 @@ export function ActionRemarksSection({
   const [deleteAction, deleteState] = useDeleteMgmtActionMutation();
   const busy = createState.isLoading || updateState.isLoading || deleteState.isLoading;
 
-  const hasGap = Boolean(draft.remark?.trim());
+  // "Gap flagged" tracks the toggle state — set to true the moment the
+  // user picks "Yes", even before they've typed a remark. Previously we
+  // derived this from `draft.remark?.trim()`, which meant the Yes button
+  // and card tint didn't flip on toggle alone (empty string = false).
+  // The backend view v_outstanding_gaps still requires non-empty text to
+  // list a project in the Outstanding Gaps tab; the tint just reflects
+  // the user's stated intent.
+  const gapFlagged = draft.remark !== null;
+  const hasGapText = Boolean(draft.remark?.trim());
 
   const handleAdd = async (): Promise<void> => {
     if (!projectId || !newTopic.trim()) return;
@@ -81,13 +89,13 @@ export function ActionRemarksSection({
   };
 
   return (
-    // Card gets an amber/red tint whenever the project has an Outstanding
-    // Gap (spec §5-§7). Non-gap state stays neutral white so the section
+    // Card gets an amber/red tint whenever the toggle is set to "Yes"
+    // (spec §5-§7). Non-gap state stays neutral white so the section
     // isn't visually noisy for the common case.
     <Card
       className={cn(
         'transition-colors',
-        hasGap
+        gapFlagged
           ? 'border-[#F59E0B] bg-[#FFFBEB] shadow-[0_0_0_2px_rgba(245,158,11,0.15)]'
           : '',
       )}
@@ -97,8 +105,10 @@ export function ActionRemarksSection({
           num={num}
           title="Action & Remarks"
           sub={
-            hasGap
-              ? '⚠ Outstanding gap flagged — action items required'
+            gapFlagged
+              ? hasGapText
+                ? '⚠ Outstanding gap flagged — action items required'
+                : '⚠ Gap toggle on — add a remark so it appears in Outstanding Gaps'
               : 'Outstanding gaps, priority, and management action items'
           }
         />
@@ -119,11 +129,11 @@ export function ActionRemarksSection({
               <button
                 type="button"
                 onClick={() => {
-                  if (!hasGap) setField('remark', '');
+                  if (!gapFlagged) setField('remark', '');
                 }}
                 className={cn(
-                  'flex-1 px-4 py-2 text-[12px] font-bold',
-                  hasGap ? 'bg-[#DC2626] text-white' : 'bg-white text-[#6B7280]',
+                  'flex-1 px-4 py-2 text-[12px] font-bold transition-colors',
+                  gapFlagged ? 'bg-[#DC2626] text-white' : 'bg-white text-[#6B7280]',
                 )}
               >
                 ⚠ Yes — Gap Exists
@@ -132,8 +142,8 @@ export function ActionRemarksSection({
                 type="button"
                 onClick={() => setField('remark', null)}
                 className={cn(
-                  'flex-1 border-l border-[#D1D5DB] px-4 py-2 text-[12px] font-bold',
-                  !hasGap ? 'bg-[#1E3A5F] text-white' : 'bg-white text-[#6B7280]',
+                  'flex-1 border-l border-[#D1D5DB] px-4 py-2 text-[12px] font-bold transition-colors',
+                  !gapFlagged ? 'bg-[#1E3A5F] text-white' : 'bg-white text-[#6B7280]',
                 )}
               >
                 ✓ No — No Gap
