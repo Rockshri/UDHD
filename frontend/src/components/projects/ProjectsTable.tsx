@@ -6,6 +6,11 @@ import { formatCurrencyCr, formatDate } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { ColumnFilterButton } from '../table/ColumnFilterButton';
+import {
+  NumericFilterButton,
+  matchesNumericFilter,
+  type NumericFilter,
+} from '../table/NumericFilterButton';
 import { useColumnFilters, type ColumnAccessor } from '../table/useColumnFilters';
 import { OmAlertCell } from './OmAlertCell';
 import { PbgAlertCell } from './PbgAlertCell';
@@ -427,6 +432,11 @@ export function ProjectsTable({
   }, [visibleColumns, ctx]);
   const colFilters = useColumnFilters<ProjectListItem>({ rows, columns: columnAccessors });
 
+  // AA-amount numeric filter (operator + threshold) — doesn't fit the
+  // discrete-value column-filter primitive so it's tracked separately
+  // and applied after colFilters.filteredRows.
+  const [aaFilter, setAaFilter] = useState<NumericFilter | null>(null);
+
   // Multi-select is "on" only when a selectedIds Set was passed. That way
   // legacy callers with no selection props render the table as before.
   const selectMode = selectedIds !== undefined;
@@ -452,7 +462,11 @@ export function ProjectsTable({
   };
 
   const sortedRows = useMemo(() => {
-    const source = colFilters.filteredRows;
+    // Column filters run first (they're set-membership; cheaper); then
+    // the AA numeric predicate narrows further.
+    const source = aaFilter
+      ? colFilters.filteredRows.filter((r) => matchesNumericFilter(aaFilter, r.aaAmountCr))
+      : colFilters.filteredRows;
     if (sortKey === 'sno') return source;
     const col = COLUMNS.find((c) => c.key === sortKey);
     if (!col?.sortValue) return source;
@@ -467,7 +481,7 @@ export function ProjectsTable({
       return 0;
     });
     return arr;
-  }, [colFilters.filteredRows, sortKey, sortDir]);
+  }, [colFilters.filteredRows, aaFilter, sortKey, sortDir]);
 
   const onSort = (key: string): void => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -482,14 +496,18 @@ export function ProjectsTable({
     <div className="rounded-lg border border-[#E5E7EB] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#F3F4F6] px-3 py-2">
         <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[#6B7280]">
-          {colFilters.activeCount > 0
-            ? `${sortedRows.length} of ${rows.length} on this page match ${colFilters.activeCount} column filter${colFilters.activeCount === 1 ? '' : 's'}`
+          {(colFilters.activeCount + (aaFilter ? 1 : 0)) > 0
+            ? `${sortedRows.length} of ${rows.length} on this page match ${colFilters.activeCount + (aaFilter ? 1 : 0)} column filter${(colFilters.activeCount + (aaFilter ? 1 : 0)) === 1 ? '' : 's'}`
             : `${rows.length} project${rows.length === 1 ? '' : 's'} on this page`}
           {isFetching ? ' · refreshing…' : ''}
         </span>
         <div className="flex items-center gap-2">
-          {colFilters.activeCount > 0 ? (
-            <Button variant="ghost" size="sm" onClick={colFilters.clearAll}>
+          {(colFilters.activeCount > 0 || aaFilter) ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { colFilters.clearAll(); setAaFilter(null); }}
+            >
               ✕ Clear column filters
             </Button>
           ) : null}
@@ -586,6 +604,14 @@ export function ProjectsTable({
                       onChange={(next) => colFilters.setSelected(c.key, next)}
                       // Rightmost couple of columns anchor their popover to the
                       // right so it doesn't get clipped off the table edge.
+                      align={idx >= visibleColumns.length - 3 ? 'end' : 'start'}
+                    />
+                  ) : null}
+                  {c.key === 'aaAmountCr' ? (
+                    <NumericFilterButton
+                      label="AA Amount"
+                      filter={aaFilter}
+                      onChange={setAaFilter}
                       align={idx >= visibleColumns.length - 3 ? 'end' : 'start'}
                     />
                   ) : null}
