@@ -321,6 +321,21 @@ function DashboardTab({
   drillProjects: ProjectListItem[];
   lookups: Lookups | undefined;
 }): JSX.Element {
+  // Column filters on the drill table. Same pattern as the Project Stages
+  // tab. Only columns backed by the light ProjectListItem are filterable
+  // — Department and Agreement Number come from a per-row detail fetch
+  // and would be undefined while loading.
+  const drillAccessors = useMemo<Record<string, ColumnAccessor<ProjectListItem>>>(() => ({
+    division: (p) =>
+      p.divisionId
+        ? lookups?.divisions.find((d) => d.divisionId === p.divisionId)?.divisionName ?? null
+        : null,
+    contractor: (p) => p.contractor,
+    nitStatus: (p) => (p.nitNumber && p.nitNumber.trim() !== '' ? 'Published' : 'Yet to be Published'),
+  }), [lookups]);
+  const drillFilters = useColumnFilters<ProjectListItem>({ rows: drillProjects, columns: drillAccessors });
+  const filteredDrill = drillFilters.filteredRows;
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -365,16 +380,34 @@ function DashboardTab({
             <span className="text-[12px] font-bold text-[#111827]">
               {selectedStage}
               <span className="ml-2 text-[11px] font-normal text-[#6B7280]">
-                — {drillProjects.length} project{drillProjects.length === 1 ? '' : 's'}
+                — {drillFilters.activeCount > 0
+                  ? `${filteredDrill.length} of ${drillProjects.length}`
+                  : drillProjects.length} project{
+                  (drillFilters.activeCount > 0 ? filteredDrill.length : drillProjects.length) === 1 ? '' : 's'
+                }
+                {drillFilters.activeCount > 0
+                  ? ` match ${drillFilters.activeCount} column filter${drillFilters.activeCount === 1 ? '' : 's'}`
+                  : ''}
               </span>
             </span>
-            <button
-              type="button"
-              onClick={() => onSelect(null)}
-              className="text-[11px] font-semibold text-[#6B7280] hover:text-[#B91C1C]"
-            >
-              Clear
-            </button>
+            <div className="flex items-center gap-3">
+              {drillFilters.activeCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={drillFilters.clearAll}
+                  className="text-[11px] font-semibold text-[#B91C1C] hover:underline"
+                >
+                  ✕ Clear filters
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onSelect(null)}
+                className="text-[11px] font-semibold text-[#6B7280] hover:text-[#B91C1C]"
+              >
+                Clear
+              </button>
+            </div>
           </div>
           {drillProjects.length === 0 ? (
             <p className="px-3 py-6 text-center text-[12.5px] text-[#6B7280]">
@@ -386,25 +419,57 @@ function DashboardTab({
                 <thead>
                   <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
                     <th className="px-3 py-2 text-left">Project Name</th>
-                    <th className="px-3 py-2 text-left">Division</th>
+                    <th className="px-3 py-2 text-left">
+                      Division
+                      <ColumnFilterButton
+                        label="Division"
+                        options={drillFilters.optionsFor('division')}
+                        selected={drillFilters.selected('division')}
+                        onChange={(next) => drillFilters.setSelected('division', next)}
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left">Department</th>
                     <th className="px-3 py-2 text-left">Agreement Number</th>
-                    <th className="px-3 py-2 text-left">Contractor</th>
-                    <th className="px-3 py-2 text-left">NIT Number</th>
+                    <th className="px-3 py-2 text-left">
+                      Contractor
+                      <ColumnFilterButton
+                        label="Contractor"
+                        options={drillFilters.optionsFor('contractor')}
+                        selected={drillFilters.selected('contractor')}
+                        onChange={(next) => drillFilters.setSelected('contractor', next)}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">
+                      NIT Number
+                      <ColumnFilterButton
+                        label="NIT Status"
+                        options={drillFilters.optionsFor('nitStatus')}
+                        selected={drillFilters.selected('nitStatus')}
+                        onChange={(next) => drillFilters.setSelected('nitStatus', next)}
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left">NIT Date</th>
                     <th className="px-3 py-2 text-left">Current Sub-Stage</th>
                     <th className="px-3 py-2 text-left">Last Updated</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {drillProjects.map((p) => (
-                    <ProjectDrillRow
-                      key={p.projectId}
-                      project={p}
-                      lookups={lookups}
-                      subStage={selectedStage}
-                    />
-                  ))}
+                  {filteredDrill.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-3 py-6 text-center text-[12.5px] text-[#6B7280]">
+                        No projects match the current filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredDrill.map((p) => (
+                      <ProjectDrillRow
+                        key={p.projectId}
+                        project={p}
+                        lookups={lookups}
+                        subStage={selectedStage}
+                      />
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
