@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGetLookupsQuery } from '../../app/api/lookupsApi';
 import {
+  projectsApi,
   useGetProjectQuery,
   useListProjectsQuery,
   useTransferTenderMutation,
@@ -321,18 +322,46 @@ function DashboardTab({
   drillProjects: ProjectListItem[];
   lookups: Lookups | undefined;
 }): JSX.Element {
-  // Column filters on the drill table. Same pattern as the Project Stages
-  // tab. Only columns backed by the light ProjectListItem are filterable
-  // — Department and Agreement Number come from a per-row detail fetch
-  // and would be undefined while loading.
+  // Column filters on the drill table — every column filterable.
+  //
+  // Department + Agreement Number live on ProjectDetail, not on the light
+  // ProjectListItem. The child ProjectDrillRow already fetches per-row
+  // detail (which caches into RTK Query), so we read those from the cache
+  // via a selector. Filter dropdown options for those two columns
+  // populate as rows load; that's the price of not having a bulk-detail
+  // endpoint.
+  const detailByProjectId = useAppSelector((state) => {
+    const map = new Map<string, { sponsoringDept: string | null; agreementNumber: string | null }>();
+    for (const p of drillProjects) {
+      const cached = projectsApi.endpoints.getProject.select(p.projectId)(state).data;
+      if (cached) {
+        map.set(p.projectId, {
+          sponsoringDept: cached.sponsoringDept ?? null,
+          agreementNumber: cached.agreementNumber ?? null,
+        });
+      }
+    }
+    return map;
+  });
+
   const drillAccessors = useMemo<Record<string, ColumnAccessor<ProjectListItem>>>(() => ({
+    projectName: (p) => p.projectName,
     division: (p) =>
       p.divisionId
         ? lookups?.divisions.find((d) => d.divisionId === p.divisionId)?.divisionName ?? null
         : null,
+    department: (p) => detailByProjectId.get(p.projectId)?.sponsoringDept ?? null,
+    agreementNumber: (p) => detailByProjectId.get(p.projectId)?.agreementNumber ?? null,
     contractor: (p) => p.contractor,
-    nitStatus: (p) => (p.nitNumber && p.nitNumber.trim() !== '' ? 'Published' : 'Yet to be Published'),
-  }), [lookups]);
+    nitNumber: (p) => (p.nitNumber && p.nitNumber.trim() !== '' ? 'Published' : 'Yet to be Published'),
+    nitDate: (p) => (p.nitDate ? formatDate(p.nitDate) : null),
+    // Sub-Stage is constant within a single drill (the drill IS a sub-stage
+    // slice) — filter option list will always have one value. Included so
+    // 'every column is filterable' holds; hide it later if it feels noisy.
+    subStage: () => selectedStage,
+    lastUpdated: (p) =>
+      p.lastUpdated ? formatDate(p.lastUpdated.slice(0, 10)) : null,
+  }), [lookups, detailByProjectId, selectedStage]);
   const drillFilters = useColumnFilters<ProjectListItem>({ rows: drillProjects, columns: drillAccessors });
   const filteredDrill = drillFilters.filteredRows;
 
@@ -418,7 +447,15 @@ function DashboardTab({
               <table className="w-full min-w-[960px] border-collapse text-[12px]">
                 <thead>
                   <tr className="bg-[#F9FAFB] text-[10.5px] font-bold uppercase tracking-wider text-[#6B7280]">
-                    <th className="px-3 py-2 text-left">Project Name</th>
+                    <th className="px-3 py-2 text-left">
+                      Project Name
+                      <ColumnFilterButton
+                        label="Project Name"
+                        options={drillFilters.optionsFor('projectName')}
+                        selected={drillFilters.selected('projectName')}
+                        onChange={(next) => drillFilters.setSelected('projectName', next)}
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left">
                       Division
                       <ColumnFilterButton
@@ -428,8 +465,24 @@ function DashboardTab({
                         onChange={(next) => drillFilters.setSelected('division', next)}
                       />
                     </th>
-                    <th className="px-3 py-2 text-left">Department</th>
-                    <th className="px-3 py-2 text-left">Agreement Number</th>
+                    <th className="px-3 py-2 text-left">
+                      Department
+                      <ColumnFilterButton
+                        label="Department"
+                        options={drillFilters.optionsFor('department')}
+                        selected={drillFilters.selected('department')}
+                        onChange={(next) => drillFilters.setSelected('department', next)}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">
+                      Agreement Number
+                      <ColumnFilterButton
+                        label="Agreement Number"
+                        options={drillFilters.optionsFor('agreementNumber')}
+                        selected={drillFilters.selected('agreementNumber')}
+                        onChange={(next) => drillFilters.setSelected('agreementNumber', next)}
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left">
                       Contractor
                       <ColumnFilterButton
@@ -442,15 +495,40 @@ function DashboardTab({
                     <th className="px-3 py-2 text-left">
                       NIT Number
                       <ColumnFilterButton
-                        label="NIT Status"
-                        options={drillFilters.optionsFor('nitStatus')}
-                        selected={drillFilters.selected('nitStatus')}
-                        onChange={(next) => drillFilters.setSelected('nitStatus', next)}
+                        label="NIT Number"
+                        options={drillFilters.optionsFor('nitNumber')}
+                        selected={drillFilters.selected('nitNumber')}
+                        onChange={(next) => drillFilters.setSelected('nitNumber', next)}
                       />
                     </th>
-                    <th className="px-3 py-2 text-left">NIT Date</th>
-                    <th className="px-3 py-2 text-left">Current Sub-Stage</th>
-                    <th className="px-3 py-2 text-left">Last Updated</th>
+                    <th className="px-3 py-2 text-left">
+                      NIT Date
+                      <ColumnFilterButton
+                        label="NIT Date"
+                        options={drillFilters.optionsFor('nitDate')}
+                        selected={drillFilters.selected('nitDate')}
+                        onChange={(next) => drillFilters.setSelected('nitDate', next)}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">
+                      Current Sub-Stage
+                      <ColumnFilterButton
+                        label="Current Sub-Stage"
+                        options={drillFilters.optionsFor('subStage')}
+                        selected={drillFilters.selected('subStage')}
+                        onChange={(next) => drillFilters.setSelected('subStage', next)}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">
+                      Last Updated
+                      <ColumnFilterButton
+                        label="Last Updated"
+                        options={drillFilters.optionsFor('lastUpdated')}
+                        selected={drillFilters.selected('lastUpdated')}
+                        onChange={(next) => drillFilters.setSelected('lastUpdated', next)}
+                        align="end"
+                      />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
